@@ -1,6 +1,13 @@
 import mongoose from 'mongoose';
 
 const orderSchema = new mongoose.Schema({
+  // Order Number
+  orderNumber: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+
   // Customer Information
   customerName: {
     type: String,
@@ -118,21 +125,14 @@ const orderSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Generate order number
-orderSchema.pre('save', async function(next) {
+// Generate order number using timestamp + random suffix to avoid race conditions
+orderSchema.pre('save', function(next) {
   if (this.isNew && !this.orderNumber) {
-    const count = await mongoose.model('Order').countDocuments();
-    this.orderNumber = `A5X${String(count + 1).padStart(6, '0')}`;
+    const ts = Date.now().toString(36).toUpperCase();
+    const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+    this.orderNumber = `A5X-${ts}-${rand}`;
   }
   next();
-});
-
-// Add order number field
-orderSchema.add({
-  orderNumber: {
-    type: String,
-    unique: true
-  }
 });
 
 const Order = mongoose.model('Order', orderSchema);

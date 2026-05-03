@@ -56,7 +56,11 @@ router.post('/', async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating order:', error);
-    res.status(500).json({ error: 'Failed to create order' });
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(e => e.message);
+      return res.status(400).json({ error: 'Validation failed', details: messages });
+    }
+    res.status(500).json({ error: 'Failed to create order', detail: error.message });
   }
 });
 
