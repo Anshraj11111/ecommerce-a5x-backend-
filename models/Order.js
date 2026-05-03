@@ -125,12 +125,16 @@ const orderSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Generate order number using timestamp + random suffix to avoid race conditions
-orderSchema.pre('save', function(next) {
+// Generate sequential order number A5X-000001, A5X-000002, ...
+orderSchema.pre('save', async function(next) {
   if (this.isNew && !this.orderNumber) {
-    const ts = Date.now().toString(36).toUpperCase();
-    const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
-    this.orderNumber = `A5X-${ts}-${rand}`;
+    try {
+      const count = await mongoose.model('Order').countDocuments();
+      this.orderNumber = `A5X-${String(count + 1).padStart(6, '0')}`;
+    } catch {
+      // fallback to timestamp if count fails
+      this.orderNumber = `A5X-${Date.now().toString().slice(-6)}`;
+    }
   }
   next();
 });

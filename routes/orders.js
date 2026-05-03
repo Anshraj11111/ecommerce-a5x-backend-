@@ -21,6 +21,21 @@ function generateOrderNumber() {
   return `A5X-${ts}-${rand}`;
 }
 
+async function getNextOrderNumber() {
+  // Try MongoDB first
+  if (dbReady()) {
+    try {
+      const count = await mongoose.model('Order').countDocuments();
+      return `A5X-${String(count + 1).padStart(6, '0')}`;
+    } catch {
+      // fall through to JSON fallback counter
+    }
+  }
+  // JSON fallback — count existing orders
+  const orders = await readOrdersFallback();
+  return `A5X-${String(orders.length + 1).padStart(6, '0')}`;
+}
+
 async function readOrdersFallback() {
   try {
     const data = await fs.readFile(ordersFilePath, 'utf8');
@@ -56,7 +71,7 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const orderNumber = generateOrderNumber();
+    const orderNumber = await getNextOrderNumber();
     const now = new Date().toISOString();
 
     // Use MongoDB if connected, otherwise fall back to JSON file
