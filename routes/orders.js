@@ -155,61 +155,80 @@ router.get('/:id', authenticateToken, authorizeRole(['admin']), async (req, res)
 router.patch('/:id/status', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   try {
     const { status, trackingNumber, adminNotes } = req.body;
-    
-    const order = await Order.findById(req.params.id);
-    
-    if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
+    const now = new Date();
+
+    if (dbReady()) {
+      const order = await Order.findById(req.params.id);
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+
+      if (status) {
+        order.status = status;
+        if (status === 'confirmed' && !order.confirmedAt) order.confirmedAt = now;
+        else if (status === 'shipped' && !order.shippedAt) order.shippedAt = now;
+        else if (status === 'delivered' && !order.deliveredAt) order.deliveredAt = now;
+      }
+      if (trackingNumber) order.trackingNumber = trackingNumber;
+      if (adminNotes) order.adminNotes = adminNotes;
+
+      await order.save();
+
+      // Send email immediately — don't await so response is fast
+      if (status === 'confirmed') {
+        sendOrderConfirmationEmail(order).catch(e => console.error('Email error:', e.message));
+      } else if (status === 'shipped') {
+        sendShippingEmail(order).catch(e => console.error('Email error:', e.message));
+      }
+
+      return res.json({ success: true, message: 'Order updated successfully', order });
     }
 
-    // Update status
+    // JSON fallback
+    const orders = await readOrdersFallback();
+    const idx = orders.findIndex(o => o._id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Order not found' });
+
+    const order = { ...orders[idx] };
     if (status) {
       order.status = status;
-      
-      // Update timestamps based on status
-      if (status === 'confirmed' && !order.confirmedAt) {
-        order.confirmedAt = new Date();
-      } else if (status === 'shipped' && !order.shippedAt) {
-        order.shippedAt = new Date();
-      } else if (status === 'delivered' && !order.deliveredAt) {
-        order.deliveredAt = new Date();
-      }
+      if (status === 'confirmed' && !order.confirmedAt) order.confirmedAt = now.toISOString();
+      else if (status === 'shipped' && !order.shippedAt) order.shippedAt = now.toISOString();
+      else if (status === 'delivered' && !order.deliveredAt) order.deliveredAt = now.toISOString();
     }
-
     if (trackingNumber) order.trackingNumber = trackingNumber;
     if (adminNotes) order.adminNotes = adminNotes;
+    order.updatedAt = now.toISOString();
 
-    await order.save();
+    orders[idx] = order;
+    await writeOrdersFallback(orders);
 
-    // Send notification to customer
+    // Send email immediately — don't await
     if (status === 'confirmed') {
-      await sendOrderConfirmationEmail(order);
-      await sendOrderConfirmationSMS(order);
+      sendOrderConfirmationEmail(order).catch(e => console.error('Email error:', e.message));
     } else if (status === 'shipped') {
-      await sendShippingEmail(order);
-      await sendShippingSMS(order);
+      sendShippingEmail(order).catch(e => console.error('Email error:', e.message));
     }
 
-    res.json({
-      success: true,
-      message: 'Order updated successfully',
-      order
-    });
+    return res.json({ success: true, message: 'Order updated successfully', order });
   } catch (error) {
     console.error('Error updating order:', error);
-    res.status(500).json({ error: 'Failed to update order' });
+    res.status(500).json({ error: 'Failed to update order', detail: error.message });
   }
 });
 
 // Delete order (Admin only)
 router.delete('/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   try {
-    const order = await Order.findByIdAndDelete(req.params.id);
-    
-    if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
+    if (dbReady()) {
+      const order = await Order.findByIdAndDelete(req.params.id);
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+      return res.json({ success: true, message: 'Order deleted successfully' });
     }
 
+    const orders = await readOrdersFallback();
+    const idx = orders.findIndex(o => o._id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Order not found' });
+    orders.splice(idx, 1);
+    await writeOrdersFallback(orders);
     res.json({ success: true, message: 'Order deleted successfully' });
   } catch (error) {
     console.error('Error deleting order:', error);
