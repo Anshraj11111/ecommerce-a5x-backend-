@@ -1,31 +1,18 @@
 import nodemailer from 'nodemailer';
 
-/**
- * Email Service using Gmail (FREE)
- * 
- * Setup Instructions:
- * 1. Go to https://myaccount.google.com/apppasswords
- * 2. Create an "App Password" for "Mail"
- * 3. Copy the 16-character password
- * 4. Add to .env file:
- *    EMAIL_USER=your-email@gmail.com
- *    EMAIL_PASS=your-app-password
- */
-
-// Create transporter
-let transporter = null;
-
+// Create transporter fresh each time (don't cache — env vars may change on redeploy)
 function getTransporter() {
-  if (!transporter && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-    transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
-    });
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s/g, '') : '';
+
+  if (!user || !pass) {
+    return null;
   }
-  return transporter;
+
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user, pass }
+  });
 }
 
 /**
@@ -35,10 +22,11 @@ export async function sendOrderConfirmationEmail(order) {
   const transport = getTransporter();
   
   if (!transport) {
-    console.log('📧 Email not configured. Skipping email notification.');
-    console.log('📧 Would send to:', order.customerEmail);
+    console.error('❌ Email not configured — EMAIL_USER or EMAIL_PASS missing in env vars.');
     return;
   }
+
+  console.log(`📧 Sending confirmation email to ${order.customerEmail}...`);
 
   const emailContent = `
 <!DOCTYPE html>
@@ -119,7 +107,8 @@ export async function sendOrderConfirmationEmail(order) {
     
     console.log(`✅ Order confirmation email sent to ${order.customerEmail}`);
   } catch (error) {
-    console.error('❌ Error sending email:', error.message);
+    console.error('❌ Error sending confirmation email:', error.message);
+    console.error('   Code:', error.code, '| Response:', error.response);
   }
 }
 
