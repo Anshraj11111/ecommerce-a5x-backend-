@@ -13,6 +13,7 @@ import orderRoutes from "./routes/orders.js";
 import contactRoutes from "./routes/contacts.js";
 import logger from "./utils/logger.js";
 import { seedDatabase } from "./utils/seeder.js";
+import { testEmailConfig, sendOrderConfirmationEmail } from "./services/emailService.js";
 
 dotenv.config();
 
@@ -78,6 +79,31 @@ app.get("/api/health", (_req, res) => {
     database: mongoose.connection.readyState === 1 ? "mongodb" : "json-fallback",
     timestamp: new Date().toISOString()
   });
+});
+
+// Email test endpoint (No auth — for debugging only)
+app.get("/api/test-email", async (req, res) => {
+  const result = await testEmailConfig();
+  if (result.ok) {
+    // Send a real test email to the configured EMAIL_USER
+    try {
+      await sendOrderConfirmationEmail({
+        customerName: 'Test User',
+        customerEmail: process.env.EMAIL_USER,
+        orderNumber: 'TEST-000001',
+        createdAt: new Date(),
+        items: [{ name: 'ESP32 DevKit', quantity: 1, price: 350 }],
+        total: 350,
+        address: { street: '123 Test St', city: 'Mumbai', state: 'MH', pincode: '400001' },
+        paymentMethod: 'cod'
+      });
+      res.json({ ok: true, message: `Test email sent to ${process.env.EMAIL_USER}` });
+    } catch (err) {
+      res.json({ ok: false, error: err.message });
+    }
+  } else {
+    res.json({ ok: false, error: result.error });
+  }
 });
 
 // Public API routes

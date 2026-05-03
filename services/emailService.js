@@ -10,9 +10,37 @@ function getTransporter() {
   }
 
   return nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
     auth: { user, pass }
   });
+}
+
+/**
+ * Test email configuration — call this to verify credentials work
+ */
+export async function testEmailConfig() {
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s/g, '') : '';
+  console.log('📧 Email config check:');
+  console.log('   USER:', user || 'NOT SET');
+  console.log('   PASS length:', pass.length, '(should be 16)');
+
+  const transport = getTransporter();
+  if (!transport) {
+    console.error('❌ Transporter could not be created');
+    return { ok: false, error: 'Missing credentials' };
+  }
+
+  try {
+    await transport.verify();
+    console.log('✅ SMTP connection verified successfully');
+    return { ok: true };
+  } catch (err) {
+    console.error('❌ SMTP verify failed:', err.message);
+    return { ok: false, error: err.message };
+  }
 }
 
 /**
