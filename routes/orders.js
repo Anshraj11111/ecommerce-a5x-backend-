@@ -1,9 +1,38 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
+import mongoose from 'mongoose';
 import Order from '../models/Order.js';
 import { authenticateToken, authorizeRole } from '../middleware/auth.js';
 import { sendOrderConfirmationEmail, sendShippingEmail } from '../services/emailService.js';
 
 const router = express.Router();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ordersFilePath = path.join(__dirname, '..', 'data', 'orders.json');
+
+function dbReady() {
+  return mongoose.connection.readyState === 1;
+}
+
+function generateOrderNumber() {
+  const ts = Date.now().toString(36).toUpperCase();
+  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `A5X-${ts}-${rand}`;
+}
+
+async function readOrdersFallback() {
+  try {
+    const data = await fs.readFile(ordersFilePath, 'utf8');
+    return JSON.parse(data);
+  } catch {
+    return [];
+  }
+}
+
+async function writeOrdersFallback(orders) {
+  await fs.writeFile(ordersFilePath, JSON.stringify(orders, null, 2));
+}
 
 // Create new order (Public)
 router.post('/', async (req, res) => {
@@ -27,32 +56,46 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Create order
-    const order = new Order({
-      customerName,
-      customerEmail,
-      customerPhone,
-      address,
-      items,
-      subtotal,
-      shippingCost: shippingCost || 0,
-      tax: tax || 0,
-      total,
+    const orderNumber = generateOrderNumber();
+    const now = new Date().toISOString();
+
+    // Use MongoDB if connected, otherwise fall back to JSON file
+    if (dbReady()) {
+      const order = new Order({
+        orderNumber,
+        customerName, customerEmail, customerPhone, address, items,
+        subtotal, shippingCost: shippingCost || 0, tax: tax || 0, total,
+        paymentMethod: paymentMethod || 'cod', customerNotes
+      });
+      await order.save();
+      return res.status(201).json({
+        success: true,
+        message: 'Order placed successfully',
+        order: { orderNumber: order.orderNumber, orderId: order._id, total: order.total, status: order.status }
+      });
+    }
+
+    // JSON fallback — works even when MongoDB is unavailable
+    const orders = await readOrdersFallback();
+    const newOrder = {
+      _id: `order-${Date.now()}`,
+      orderNumber,
+      customerName, customerEmail, customerPhone, address, items,
+      subtotal, shippingCost: shippingCost || 0, tax: tax || 0, total,
       paymentMethod: paymentMethod || 'cod',
-      customerNotes
-    });
+      customerNotes: customerNotes || '',
+      status: 'pending',
+      paymentStatus: 'pending',
+      createdAt: now,
+      updatedAt: now
+    };
+    orders.unshift(newOrder);
+    await writeOrdersFallback(orders);
 
-    await order.save();
-
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: 'Order placed successfully',
-      order: {
-        orderNumber: order.orderNumber,
-        orderId: order._id,
-        total: order.total,
-        status: order.status
-      }
+      order: { orderNumber: newOrder.orderNumber, orderId: newOrder._id, total: newOrder.total, status: newOrder.status }
     });
   } catch (error) {
     console.error('Error creating order:', error);
@@ -68,26 +111,21 @@ router.post('/', async (req, res) => {
 router.get('/', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
-    
-    const query = status ? { status } : {};
     const skip = (page - 1) * limit;
 
-    const orders = await Order.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
+    if (dbReady()) {
+      const query = status ? { status } : {};
+      const orders = await Order.find(query).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit));
+      const total = await Order.countDocuments(query);
+      return res.json({ orders, pagination: { page: parseInt(page), limit: parseInt(limit), total, pages: Math.ceil(total / limit) } });
+    }
 
-    const total = await Order.countDocuments(query);
-
-    res.json({
-      orders,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit)
-      }
-    });
+    // JSON fallback
+    let orders = await readOrdersFallback();
+    if (status) orders = orders.filter(o => o.status === status);
+    const total = orders.length;
+    const paginated = orders.slice(skip, skip + parseInt(limit));
+    res.json({ orders: paginated, pagination: { page: parseInt(page), limit: parseInt(limit), total, pages: Math.ceil(total / limit) } });
   } catch (error) {
     console.error('Error fetching orders:', error);
     res.status(500).json({ error: 'Failed to fetch orders' });
@@ -97,12 +135,15 @@ router.get('/', authenticateToken, authorizeRole(['admin']), async (req, res) =>
 // Get single order by ID (Admin only)
 router.get('/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id);
-    
-    if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
+    if (dbReady()) {
+      const order = await Order.findById(req.params.id);
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+      return res.json(order);
     }
 
+    const orders = await readOrdersFallback();
+    const order = orders.find(o => o._id === req.params.id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
     res.json(order);
   } catch (error) {
     console.error('Error fetching order:', error);
