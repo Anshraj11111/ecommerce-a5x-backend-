@@ -20,7 +20,6 @@ function getResend() {
 function getSender() {
   return process.env.EMAIL_FROM || 'A5X Industries <onboarding@resend.dev>';
 }
-
 /**
  * Test email configuration
  */
@@ -117,6 +116,7 @@ export async function sendOrderConfirmationEmail(order) {
     const { data, error } = await resend.emails.send({
       from: getSender(),
       to: order.customerEmail,
+      reply_to: process.env.EMAIL_USER || 'anshrajbaghel30@gmail.com',
       subject: `✅ Order Confirmed — #${order.orderNumber} | A5X Robotics`,
       html
     });
@@ -190,6 +190,7 @@ export async function sendShippingEmail(order) {
     const { data, error } = await resend.emails.send({
       from: getSender(),
       to: order.customerEmail,
+      reply_to: process.env.EMAIL_USER || 'anshrajbaghel30@gmail.com',
       subject: `🚚 Order Shipped — #${order.orderNumber} | A5X Robotics`,
       html
     });
