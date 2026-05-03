@@ -1,0 +1,108 @@
+[
+  {
+    "id": "robotics-zero",
+    "title": "Robotics From Zero",
+    "description": "Start with LEDs, sensors, motor drivers, then finish with a complete autonomous rover.",
+    "level": "BEGINNER",
+    "category": "Robotics",
+    "instructor": "Aarav Menon",
+    "tags": ["Arduino", "Motors", "Sensors"],
+    "isPublished": true,
+    "isFeatured": true,
+    "videos": [
+      {
+        "id": "intro",
+        "title": "Parts, Power, and Safety",
+        "description": "A calm first bench setup for new builders.",
+        "videoUrl": "",
+        "duration": 512,
+        "relatedProducts": ["uno-r3", "l298n"],
+        "publishedAt": "2026-04-01"
+      },
+      {
+        "id": "driver",
+        "title": "Driving DC Motors with L298N",
+        "description": "Wire the driver, set PWM, and test direction.",
+        "videoUrl": "",
+        "duration": 634,
+        "relatedProducts": ["l298n", "18650"],
+        "publishedAt": "2026-04-02"
+      },
+      {
+        "id": "avoid",
+        "title": "Obstacle Avoidance Logic",
+        "description": "Use ultrasonic distance readings to steer.",
+        "videoUrl": "",
+        "duration": 706,
+        "relatedProducts": ["hcsr04", "esp32"],
+        "publishedAt": "2026-04-03"
+      }
+    ]
+  },
+  {
+    "id": "esp32-iot",
+    "title": "ESP32 IoT Control Lab",
+    "description": "Wi-Fi control, dashboards, and sensor telemetry for robotics.",
+    "level": "INTERMEDIATE",
+    "category": "ESP32",
+    "instructor": "Nisha Rao",
+    "tags": ["ESP32", "IoT"],
+    "isPublished": true,
+    "isFeatured": false,
+    "videos": [
+      {
+        "id": "wifi",
+        "title": "ESP32 Wi-Fi Basics",
+        "description": "Connect, publish, and monitor device state.",
+        "videoUrl": "",
+        "duration": 588,
+        "relatedProducts": ["esp32", "oled"],
+        "publishedAt": "2026-04-05"
+      }
+    ]
+  },
+  {
+    "id": "printing",
+    "title": "3D Printed Robot Frames",
+    "description": "Design printable mounts and durable chassis geometry.",
+    "level": "ADVANCED",
+    "category": "3D Printing",
+    "instructor": "Dev Patel",
+    "tags": ["CAD", "Frames"],
+    "isPublished": true,
+    "isFeatured": false,
+    "videos": [
+      {
+        "id": "mounts",
+        "title": "Motor Mount Tolerances",
+        "description": "Make parts that assemble cleanly.",
+        "videoUrl": "",
+        "duration": 420,
+        "relatedProducts": ["l298n"],
+        "publishedAt": "2026-04-08"
+      }
+    ]
+  },
+  {
+    "id": "arduino-basics",
+    "title": "Arduino Maker Basics",
+    "description": "Inputs, outputs, displays, and readable code habits.",
+    "level": "BEGINNER",
+    "category": "Arduino",
+    "instructor": "Meera Iyer",
+    "tags": ["Arduino", "Display"],
+    "isPublished": true,
+    "isFeatured": false,
+    "videos": [
+      {
+        "id": "display",
+        "title": "LCD and OLED Output",
+        "description": "Show clean robot state on small displays.",
+        "videoUrl": "",
+        "duration": 480,
+        "relatedProducts": ["uno-r3", "oled", "lcd16"],
+        "publishedAt": "2026-04-10"
+      }
+    ]
+  }
+]

@@ -1,0 +1,56 @@
+[
+  {
+    "id": "starter",
+    "name": "Starter Robotics Kit",
+    "tier": "STARTER KIT",
+    "price": 1499,
+    "description": "Build your first robot. Motors, sensors, Arduino, and step-by-step guide.",
+    "includes": ["Arduino Uno", "L298N Driver", "2x DC Motors", "HC-SR04", "Jumper wires"],
+    "rating": 4.7
+  },
+  {
+    "id": "line-follower",
+    "name": "Line Follower Kit",
+    "tier": "PRO KIT",
+    "price": 1999,
+    "description": "Complete autonomous line-follower with IR array, code, and chassis.",
+    "includes": ["Arduino Nano", "IR Array Sensor", "L298N", "Chassis", "LiPo Battery"],
+    "rating": 4.8
+  },
+  {
+    "id": "obstacle",
+    "name": "Obstacle Avoidance Kit",
+    "tier": "PRO KIT",
+    "price": 2299,
+    "description": "Ultrasonic navigation, ESP32, chassis, and full production code.",
+    "includes": ["ESP32", "3x HC-SR04", "Motor Driver", "Chassis", "Code Package"],
+    "rating": 4.9
+  },
+  {
+    "id": "motor-drive",
+    "name": "Dual Motor Drive Pack",
+    "tier": "PRO KIT",
+    "price": 3499,
+    "description": "Matched motors, driver, wiring, mounts, and calibration notes.",
+    "includes": ["2x N20 Motors", "L298N", "Encoder Set", "Mounts", "Wiring Harness"],
+    "rating": 4.7
+  },
+  {
+    "id": "arm-builder",
+    "name": "Arm Builder Pack",
+    "tier": "ELITE KIT",
+    "price": 5999,
+    "description": "Servo-based 4-DOF robot arm with controller board and full mounts.",
+    "includes": ["4x MG996R Servo", "Controller Board", "Acrylic Frame", "PSU", "Code"],
+    "rating": 4.9
+  },
+  {
+    "id": "iot-starter",
+    "name": "IOT Starter Pack",
+    "tier": "STARTER KIT",
+    "price": 1799,
+    "description": "ESP8266, sensors, cloud dashboard setup, and complete tutorial.",
+    "includes": ["ESP8266", "DHT22", "Relay", "OLED", "Cloud Dashboard Tutorial"],
+    "rating": 4.6
+  }
+]
