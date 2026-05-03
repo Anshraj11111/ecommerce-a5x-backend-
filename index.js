@@ -85,11 +85,10 @@ app.get("/api/health", (_req, res) => {
 app.get("/api/test-email", async (req, res) => {
   const result = await testEmailConfig();
   if (result.ok) {
-    // Send a real test email to the configured EMAIL_USER
     try {
       await sendOrderConfirmationEmail({
         customerName: 'Test User',
-        customerEmail: process.env.EMAIL_USER,
+        customerEmail: process.env.EMAIL_USER || 'anshrajbaghel30@gmail.com',
         orderNumber: 'TEST-000001',
         createdAt: new Date(),
         items: [{ name: 'ESP32 DevKit', quantity: 1, price: 350 }],
@@ -97,7 +96,7 @@ app.get("/api/test-email", async (req, res) => {
         address: { street: '123 Test St', city: 'Mumbai', state: 'MH', pincode: '400001' },
         paymentMethod: 'cod'
       });
-      res.json({ ok: true, message: `Test email sent to ${process.env.EMAIL_USER}` });
+      res.json({ ok: true, message: 'Test email sent — check your inbox' });
     } catch (err) {
       res.json({ ok: false, error: err.message });
     }
