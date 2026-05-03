@@ -1,5 +1,3 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
@@ -20,8 +18,6 @@ dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3001;
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // CORS Configuration - Allow all origins in development
 app.use(cors({
@@ -85,13 +81,13 @@ app.use("/api/courses", courseRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/contacts", contactRoutes);
 
-// Static files
-const distPath = path.join(__dirname, "..", "client", "dist");
-app.use(express.static(distPath));
-
-// Fallback to index.html
-app.get("*", (_req, res) => {
-  res.sendFile(path.join(distPath, "index.html"));
+// API root response
+app.get("/", (_req, res) => {
+  res.json({ 
+    message: "A5X Robotics API is running!",
+    version: "1.0.0",
+    status: "ok"
+  });
 });
 
 // Global error handler
