@@ -41,7 +41,8 @@ export const schemas = {
     badges: Joi.array().items(Joi.string()),
     frequentlyBoughtWith: Joi.array().items(Joi.string()),
     relatedIds: Joi.array().items(Joi.string()),
-    imageUrl: Joi.string()
+    imageUrl: Joi.string(),
+    images: Joi.array().items(Joi.string())
   }),
 
   kit: Joi.object({
@@ -53,6 +54,7 @@ export const schemas = {
     includes: Joi.array().items(Joi.string()),
     rating: Joi.number().min(0).max(5),
     imageUrl: Joi.string(),
+    images: Joi.array().items(Joi.string()),
     videoUrl: Joi.string().allow(''),
     videoDuration: Joi.number().min(0)
   }),

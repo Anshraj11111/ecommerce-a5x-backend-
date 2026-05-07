@@ -115,7 +115,10 @@ router.post("/", authenticateToken, authorizeRole(["admin"]), validate(schemas.k
       description: req.validatedData.description || "",
       includes: req.validatedData.includes || [],
       rating: req.validatedData.rating || 4.5,
-      imageUrl: req.validatedData.imageUrl || ""
+      imageUrl: req.validatedData.imageUrl || "",
+      images: req.validatedData.images || [],
+      videoUrl: req.validatedData.videoUrl || "",
+      videoDuration: req.validatedData.videoDuration || 0
     };
 
     if (dbReady()) {
@@ -136,9 +139,21 @@ router.post("/", authenticateToken, authorizeRole(["admin"]), validate(schemas.k
 // PUT update kit (Admin only)
 router.put("/:id", authenticateToken, authorizeRole(["admin"]), validate(schemas.kit), async (req, res, next) => {
   try {
+    console.log('=== BACKEND PUT /api/kits/:id ===');
+    console.log('Kit ID:', req.params.id);
+    console.log('Request body images:', req.body.images);
+    console.log('Request body images length:', req.body.images?.length);
+    console.log('Validated data images:', req.validatedData.images);
+    console.log('Validated data images length:', req.validatedData.images?.length);
+    
     if (dbReady()) {
       const updated = await Kit.findOneAndUpdate({ id: req.params.id }, req.validatedData, { new: true });
       if (!updated) return res.status(404).json({ error: "Kit not found", code: "NOT_FOUND" });
+      
+      console.log('MongoDB updated kit ID:', updated.id);
+      console.log('MongoDB updated kit images:', updated.images);
+      console.log('MongoDB updated kit images length:', updated.images?.length);
+      console.log('=== END BACKEND PUT ===');
       
       res.json(updated);
       return;
