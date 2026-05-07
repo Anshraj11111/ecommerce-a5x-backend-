@@ -6,7 +6,6 @@ import Kit from "../models/Kit.js";
 import { fileURLToPath } from "url";
 import { authenticateToken, authorizeRole } from "../middleware/auth.js";
 import { validate, schemas } from "../middleware/validation.js";
-import { getCacheManager } from "../database/CacheManager.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const kitsFilePath = path.join(__dirname, "../data/kits.json");
@@ -40,18 +39,7 @@ router.get("/", async (req, res, next) => {
     const { page = 1, limit = 20 } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Generate cache key for kit list with pagination
-    const cacheKey = `kits:list:page${page}:limit${limit}`;
-    const cacheManager = getCacheManager();
-
-    // Try to get from cache first (cache-aside pattern)
-    const cachedData = await cacheManager.get(cacheKey);
-    if (cachedData) {
-      res.json(cachedData);
-      return;
-    }
-
-    // Cache miss - fetch from database
+    // Fetch from database
     if (dbReady()) {
       const total = await Kit.countDocuments();
       const kits = await Kit.find()
@@ -68,9 +56,6 @@ router.get("/", async (req, res, next) => {
           pages: Math.ceil(total / parseInt(limit))
         }
       };
-
-      // Populate cache with TTL of 300 seconds
-      await cacheManager.set(cacheKey, response, cacheManager.getTTL('kitList'));
       
       res.json(response);
       return;
@@ -89,9 +74,6 @@ router.get("/", async (req, res, next) => {
         pages: Math.ceil(kits.length / parseInt(limit))
       }
     };
-
-    // Populate cache even for fallback data
-    await cacheManager.set(cacheKey, response, cacheManager.getTTL('kitList'));
     
     res.json(response);
   } catch (error) {
@@ -102,24 +84,10 @@ router.get("/", async (req, res, next) => {
 // GET single kit by ID (Public)
 router.get("/:id", async (req, res, next) => {
   try {
-    // Generate cache key for kit detail
-    const cacheKey = `kits:detail:${req.params.id}`;
-    const cacheManager = getCacheManager();
-
-    // Try to get from cache first (cache-aside pattern)
-    const cachedData = await cacheManager.get(cacheKey);
-    if (cachedData) {
-      res.json(cachedData);
-      return;
-    }
-
-    // Cache miss - fetch from database
+    // Fetch from database
     if (dbReady()) {
       const kit = await Kit.findOne({ id: req.params.id });
       if (!kit) return res.status(404).json({ error: "Kit not found", code: "NOT_FOUND" });
-      
-      // Populate cache with TTL of 300 seconds (same as list)
-      await cacheManager.set(cacheKey, kit, cacheManager.getTTL('kitList'));
       
       res.json(kit);
       return;
@@ -129,9 +97,6 @@ router.get("/:id", async (req, res, next) => {
     const kits = await readFallback();
     const kit = kits.find(k => k.id === req.params.id);
     if (!kit) return res.status(404).json({ error: "Kit not found", code: "NOT_FOUND" });
-    
-    // Populate cache even for fallback data
-    await cacheManager.set(cacheKey, kit, cacheManager.getTTL('kitList'));
     
     res.json(kit);
   } catch (error) {
@@ -155,11 +120,6 @@ router.post("/", authenticateToken, authorizeRole(["admin"]), validate(schemas.k
 
     if (dbReady()) {
       const created = await Kit.create(kit);
-      
-      // Invalidate kit list cache (all variations)
-      const cacheManager = getCacheManager();
-      await cacheManager.deletePattern('kits:list:*');
-      
       res.status(201).json(created);
       return;
     }
@@ -167,11 +127,6 @@ router.post("/", authenticateToken, authorizeRole(["admin"]), validate(schemas.k
     const kits = await readFallback();
     kits.unshift(kit);
     await writeFallback(kits);
-    
-    // Invalidate kit list cache (all variations)
-    const cacheManager = getCacheManager();
-    await cacheManager.deletePattern('kits:list:*');
-    
     res.status(201).json(kit);
   } catch (error) {
     next(error);
@@ -185,11 +140,6 @@ router.put("/:id", authenticateToken, authorizeRole(["admin"]), validate(schemas
       const updated = await Kit.findOneAndUpdate({ id: req.params.id }, req.validatedData, { new: true });
       if (!updated) return res.status(404).json({ error: "Kit not found", code: "NOT_FOUND" });
       
-      // Invalidate cache for this kit and kit list (all variations)
-      const cacheManager = getCacheManager();
-      await cacheManager.delete(`kits:detail:${req.params.id}`);
-      await cacheManager.deletePattern('kits:list:*');
-      
       res.json(updated);
       return;
     }
@@ -198,11 +148,6 @@ router.put("/:id", authenticateToken, authorizeRole(["admin"]), validate(schemas
     if (index === -1) return res.status(404).json({ error: "Kit not found", code: "NOT_FOUND" });
     kits[index] = { ...kits[index], ...req.validatedData };
     await writeFallback(kits);
-    
-    // Invalidate cache for this kit and kit list (all variations)
-    const cacheManager = getCacheManager();
-    await cacheManager.delete(`kits:detail:${req.params.id}`);
-    await cacheManager.deletePattern('kits:list:*');
     
     res.json(kits[index]);
   } catch (error) {
@@ -217,11 +162,6 @@ router.delete("/:id", authenticateToken, authorizeRole(["admin"]), async (req, r
       const deleted = await Kit.findOneAndDelete({ id: req.params.id });
       if (!deleted) return res.status(404).json({ error: "Kit not found", code: "NOT_FOUND" });
       
-      // Invalidate cache for this kit and kit list (all variations)
-      const cacheManager = getCacheManager();
-      await cacheManager.delete(`kits:detail:${req.params.id}`);
-      await cacheManager.deletePattern('kits:list:*');
-      
       res.json({ message: "Kit deleted", kit: deleted });
       return;
     }
@@ -230,11 +170,6 @@ router.delete("/:id", authenticateToken, authorizeRole(["admin"]), async (req, r
     if (index === -1) return res.status(404).json({ error: "Kit not found", code: "NOT_FOUND" });
     const deleted = kits.splice(index, 1)[0];
     await writeFallback(kits);
-    
-    // Invalidate cache for this kit and kit list (all variations)
-    const cacheManager = getCacheManager();
-    await cacheManager.delete(`kits:detail:${req.params.id}`);
-    await cacheManager.deletePattern('kits:list:*');
     
     res.json({ message: "Kit deleted", kit: deleted });
   } catch (error) {

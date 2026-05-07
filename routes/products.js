@@ -6,7 +6,6 @@ import mongoose from "mongoose";
 import Product from "../models/Product.js";
 import { authenticateToken, authorizeRole } from "../middleware/auth.js";
 import { validate, schemas } from "../middleware/validation.js";
-import { getCacheManager } from "../database/CacheManager.js";
 
 const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
@@ -32,25 +31,21 @@ router.get("/", async (req, res, next) => {
     const { category, page = 1, limit = 20 } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Generate cache key based on query parameters
-    const cacheKey = `products:list:${category || 'all'}:page${page}:limit${limit}`;
-    const cacheManager = getCacheManager();
-
-    // Try to get from cache first (cache-aside pattern)
-    const cachedData = await cacheManager.get(cacheKey);
-    if (cachedData) {
-      res.json(cachedData);
-      return;
-    }
+    console.log(`[Products GET] Fetching products - category: ${category}, page: ${page}, limit: ${limit}`);
 
     // Cache miss - fetch from database
     if (dbReady()) {
       const filter = category ? { category } : {};
       const total = await Product.countDocuments(filter);
+      console.log(`[Products GET] Found ${total} products in database`);
+      
       const products = await Product.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(parseInt(limit));
+        .limit(parseInt(limit))
+        .lean(); // Use lean() for better performance
+      
+      console.log(`[Products GET] Fetched ${products.length} products`);
       
       const response = {
         data: products,
@@ -61,10 +56,8 @@ router.get("/", async (req, res, next) => {
           pages: Math.ceil(total / parseInt(limit))
         }
       };
-
-      // Populate cache with TTL of 300 seconds
-      await cacheManager.set(cacheKey, response, cacheManager.getTTL('productList'));
       
+      console.log(`[Products GET] Sending response with ${products.length} products`);
       res.json(response);
       return;
     }
@@ -83,12 +76,10 @@ router.get("/", async (req, res, next) => {
         pages: Math.ceil(filtered.length / parseInt(limit))
       }
     };
-
-    // Populate cache even for fallback data
-    await cacheManager.set(cacheKey, response, cacheManager.getTTL('productList'));
     
     res.json(response);
   } catch (error) {
+    console.error('[Products GET] Error:', error);
     next(error);
   }
 });
@@ -96,24 +87,10 @@ router.get("/", async (req, res, next) => {
 // GET single product by ID (Public)
 router.get("/:id", async (req, res, next) => {
   try {
-    // Generate cache key for product detail
-    const cacheKey = `products:detail:${req.params.id}`;
-    const cacheManager = getCacheManager();
-
-    // Try to get from cache first (cache-aside pattern)
-    const cachedData = await cacheManager.get(cacheKey);
-    if (cachedData) {
-      res.json(cachedData);
-      return;
-    }
-
-    // Cache miss - fetch from database
+    // Fetch from database
     if (dbReady()) {
       const product = await Product.findOne({ id: req.params.id });
       if (!product) return res.status(404).json({ error: "Product not found", code: "NOT_FOUND" });
-      
-      // Populate cache with TTL of 600 seconds
-      await cacheManager.set(cacheKey, product, cacheManager.getTTL('productDetail'));
       
       res.json(product);
       return;
@@ -123,9 +100,6 @@ router.get("/:id", async (req, res, next) => {
     const products = await readFallback();
     const product = products.find((p) => p.id === req.params.id);
     if (!product) return res.status(404).json({ error: "Product not found", code: "NOT_FOUND" });
-    
-    // Populate cache even for fallback data
-    await cacheManager.set(cacheKey, product, cacheManager.getTTL('productDetail'));
     
     res.json(product);
   } catch (error) {
@@ -161,11 +135,6 @@ router.post("/", authenticateToken, authorizeRole(["admin"]), validate(schemas.p
 
     if (dbReady()) {
       const created = await Product.create(product);
-      
-      // Invalidate product list cache (all variations)
-      const cacheManager = getCacheManager();
-      await cacheManager.deletePattern('products:list:*');
-      
       res.status(201).json(created);
       return;
     }
@@ -173,11 +142,6 @@ router.post("/", authenticateToken, authorizeRole(["admin"]), validate(schemas.p
     const products = await readFallback();
     products.unshift(product);
     await writeFallback(products);
-    
-    // Invalidate product list cache (all variations)
-    const cacheManager = getCacheManager();
-    await cacheManager.deletePattern('products:list:*');
-    
     res.status(201).json(product);
   } catch (error) {
     next(error);
@@ -191,11 +155,6 @@ router.put("/:id", authenticateToken, authorizeRole(["admin"]), validate(schemas
       const updated = await Product.findOneAndUpdate({ id: req.params.id }, req.validatedData, { new: true });
       if (!updated) return res.status(404).json({ error: "Product not found", code: "NOT_FOUND" });
       
-      // Invalidate cache for this product and all product lists
-      const cacheManager = getCacheManager();
-      await cacheManager.delete(`products:detail:${req.params.id}`);
-      await cacheManager.deletePattern('products:list:*');
-      
       res.json(updated);
       return;
     }
@@ -205,11 +164,6 @@ router.put("/:id", authenticateToken, authorizeRole(["admin"]), validate(schemas
     if (index === -1) return res.status(404).json({ error: "Product not found", code: "NOT_FOUND" });
     products[index] = { ...products[index], ...req.validatedData };
     await writeFallback(products);
-    
-    // Invalidate cache for this product and all product lists
-    const cacheManager = getCacheManager();
-    await cacheManager.delete(`products:detail:${req.params.id}`);
-    await cacheManager.deletePattern('products:list:*');
     
     res.json(products[index]);
   } catch (error) {
@@ -224,11 +178,6 @@ router.delete("/:id", authenticateToken, authorizeRole(["admin"]), async (req, r
       const deleted = await Product.findOneAndDelete({ id: req.params.id });
       if (!deleted) return res.status(404).json({ error: "Product not found", code: "NOT_FOUND" });
       
-      // Invalidate cache for this product and all product lists
-      const cacheManager = getCacheManager();
-      await cacheManager.delete(`products:detail:${req.params.id}`);
-      await cacheManager.deletePattern('products:list:*');
-      
       res.json({ message: "Product deleted", product: deleted });
       return;
     }
@@ -239,11 +188,6 @@ router.delete("/:id", authenticateToken, authorizeRole(["admin"]), async (req, r
     const deleted = products.splice(index, 1);
     await writeFallback(products);
     
-    // Invalidate cache for this product and all product lists
-    const cacheManager = getCacheManager();
-    await cacheManager.delete(`products:detail:${req.params.id}`);
-    await cacheManager.deletePattern('products:list:*');
-    
     res.json({ message: "Product deleted", product: deleted[0] });
   } catch (error) {
     next(error);
@@ -251,6 +195,8 @@ router.delete("/:id", authenticateToken, authorizeRole(["admin"]), async (req, r
 });
 
 router.use((error, _req, res, _next) => {
+  console.error('❌ Products route error:', error);
+  console.error('Error stack:', error.stack);
   res.status(400).json({ error: error.message || "Product request failed", code: "PRODUCT_ERROR" });
 });
 
