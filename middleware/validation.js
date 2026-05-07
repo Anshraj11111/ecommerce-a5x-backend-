@@ -3,7 +3,9 @@ import Joi from "joi";
 // Validation schemas
 export const schemas = {
   signup: Joi.object({
-    username: Joi.string().alphanum().min(3).max(30).required(),
+    username: Joi.string().min(3).max(30).required().pattern(/^[a-zA-Z0-9_-]+$/).messages({
+      "string.pattern.base": "Username can only contain letters, numbers, hyphens, and underscores"
+    }),
     email: Joi.string().email().required(),
     password: Joi.string().min(8).required().messages({
       "string.min": "Password must be at least 8 characters long"
