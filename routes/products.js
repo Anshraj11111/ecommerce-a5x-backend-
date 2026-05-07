@@ -148,6 +148,78 @@ router.post("/", authenticateToken, authorizeRole(["admin"]), validate(schemas.p
   }
 });
 
+// POST bulk create products (Admin only)
+router.post("/bulk", authenticateToken, authorizeRole(["admin"]), async (req, res, next) => {
+  try {
+    const { products } = req.body;
+    
+    if (!Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({ 
+        error: "Products array is required and must not be empty", 
+        code: "INVALID_BULK_DATA" 
+      });
+    }
+
+    console.log(`[Bulk Upload] Received ${products.length} products`);
+
+    // Prepare products with defaults
+    const preparedProducts = products.map((item, index) => ({
+      id: item.id || `product-${Date.now()}-${index}`,
+      name: item.name || `Product ${index + 1}`,
+      price: parseFloat(item.price) || 0,
+      mrp: parseFloat(item.mrp) || Math.round((parseFloat(item.price) || 0) * 1.4),
+      minQty: parseInt(item.minQty) || 1,
+      category: item.category || 'Electronics',
+      sku: item.sku || `A5X-${Date.now().toString(36).toUpperCase()}-${index}`,
+      rating: parseFloat(item.rating) || 4.7,
+      reviewCount: parseInt(item.reviewCount) || 0,
+      inStock: item.inStock !== false,
+      stockCount: parseInt(item.stockCount) || parseInt(item.qty) || 10,
+      shortDescription: item.shortDescription || item.name || '',
+      features: item.features || [],
+      specs: item.specs || {},
+      compatibility: item.compatibility || [],
+      bulkPricing: item.bulkPricing || [],
+      badges: item.badges || [],
+      frequentlyBoughtWith: item.frequentlyBoughtWith || [],
+      relatedIds: item.relatedIds || [],
+      imageUrl: item.imageUrl || '',
+      quickDelivery: item.quickDelivery || false
+    }));
+
+    if (dbReady()) {
+      // Use insertMany for bulk insert (much faster than individual creates)
+      const created = await Product.insertMany(preparedProducts, { ordered: false });
+      console.log(`[Bulk Upload] Successfully inserted ${created.length} products to MongoDB`);
+      
+      res.status(201).json({ 
+        success: true,
+        message: `Successfully added ${created.length} products to database`,
+        count: created.length,
+        products: created 
+      });
+      return;
+    }
+
+    // Fallback to JSON file
+    const existingProducts = await readFallback();
+    existingProducts.unshift(...preparedProducts);
+    await writeFallback(existingProducts);
+    
+    console.log(`[Bulk Upload] Successfully added ${preparedProducts.length} products to JSON fallback`);
+    
+    res.status(201).json({ 
+      success: true,
+      message: `Successfully added ${preparedProducts.length} products to fallback storage`,
+      count: preparedProducts.length,
+      products: preparedProducts 
+    });
+  } catch (error) {
+    console.error('[Bulk Upload] Error:', error);
+    next(error);
+  }
+});
+
 // PUT update product (Admin only)
 router.put("/:id", authenticateToken, authorizeRole(["admin"]), validate(schemas.product), async (req, res, next) => {
   try {
