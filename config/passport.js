@@ -1,7 +1,9 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import User from "../models/User.js";
-import { generateToken } from "../middleware/auth.js";
+import dotenv from "dotenv";
+
+dotenv.config(); // Ensure env vars are loaded (safe to call multiple times)
 
 export function initGoogleStrategy() {
   const clientID = process.env.GOOGLE_CLIENT_ID;
