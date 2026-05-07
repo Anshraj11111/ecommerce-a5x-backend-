@@ -1,5 +1,6 @@
 import express from "express";
 import User from "../models/User.js";
+import mongoose from "mongoose";
 import { generateToken, authenticateToken } from "../middleware/auth.js";
 import { validate, schemas } from "../middleware/validation.js";
 
@@ -8,6 +9,11 @@ const router = express.Router();
 // POST signup
 router.post("/signup", validate(schemas.signup), async (req, res, next) => {
   try {
+    console.log('=== SIGNUP REQUEST ===');
+    console.log('Request body:', req.body);
+    console.log('Validated data:', req.validatedData);
+    console.log('MongoDB connection state:', mongoose.connection.readyState);
+    
     const { username, email, password } = req.validatedData;
 
     // Check if user already exists
@@ -16,6 +22,7 @@ router.post("/signup", validate(schemas.signup), async (req, res, next) => {
     });
 
     if (existingUser) {
+      console.log('User already exists:', existingUser.email);
       return res.status(409).json({ 
         error: existingUser.email === email 
           ? "Email already registered" 
@@ -31,11 +38,14 @@ router.post("/signup", validate(schemas.signup), async (req, res, next) => {
       password
     });
 
+    console.log('Saving new user to MongoDB...');
     await user.save();
+    console.log('User saved successfully:', user._id);
 
     // Generate token
     const token = generateToken(user._id, user.username, user.role);
 
+    console.log('=== SIGNUP SUCCESS ===');
     res.status(201).json({
       message: "Account created successfully",
       user: {
@@ -47,6 +57,7 @@ router.post("/signup", validate(schemas.signup), async (req, res, next) => {
       token
     });
   } catch (error) {
+    console.error('=== SIGNUP ERROR ===', error);
     next(error);
   }
 });
@@ -54,15 +65,19 @@ router.post("/signup", validate(schemas.signup), async (req, res, next) => {
 // POST login
 router.post("/login", validate(schemas.login), async (req, res, next) => {
   try {
-    console.log('Login request body:', req.body);
+    console.log('=== LOGIN REQUEST ===');
+    console.log('Request body:', req.body);
     console.log('Validated data:', req.validatedData);
+    console.log('MongoDB connection state:', mongoose.connection.readyState);
     
     const { email, password } = req.validatedData;
 
     // Find user with password field
     const user = await User.findOne({ email }).select("+password");
+    console.log('User found:', user ? user._id : 'NOT FOUND');
 
     if (!user || !user.isActive) {
+      console.log('Login failed: Invalid credentials or inactive user');
       return res.status(401).json({ 
         error: "Invalid credentials",
         code: "INVALID_CREDENTIALS"
@@ -71,6 +86,7 @@ router.post("/login", validate(schemas.login), async (req, res, next) => {
 
     // Check if account is locked
     if (user.isLocked()) {
+      console.log('Login failed: Account locked');
       return res.status(429).json({ 
         error: "Account locked due to too many login attempts. Try again later.",
         code: "ACCOUNT_LOCKED"
@@ -79,9 +95,11 @@ router.post("/login", validate(schemas.login), async (req, res, next) => {
 
     // Verify password
     const passwordMatch = await user.comparePassword(password);
+    console.log('Password match:', passwordMatch);
 
     if (!passwordMatch) {
       await user.incLoginAttempts();
+      console.log('Login failed: Invalid password');
       return res.status(401).json({ 
         error: "Invalid credentials",
         code: "INVALID_CREDENTIALS"
@@ -94,6 +112,7 @@ router.post("/login", validate(schemas.login), async (req, res, next) => {
     // Generate token
     const token = generateToken(user._id, user.username, user.role);
 
+    console.log('=== LOGIN SUCCESS ===');
     res.json({
       message: "Login successful",
       user: {
@@ -105,6 +124,7 @@ router.post("/login", validate(schemas.login), async (req, res, next) => {
       token
     });
   } catch (error) {
+    console.error('=== LOGIN ERROR ===', error);
     next(error);
   }
 });
