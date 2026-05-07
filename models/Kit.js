@@ -10,6 +10,7 @@ const kitSchema = new mongoose.Schema(
     includes: [{ type: String }],
     rating: { type: Number, default: 4.5 },
     imageUrl: { type: String, default: "" },
+    images: [{ type: String }], // Multiple images support
     videoUrl: { type: String, default: "" },
     videoDuration: { type: Number, default: 0 }
   },

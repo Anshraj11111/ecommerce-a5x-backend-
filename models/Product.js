@@ -30,7 +30,8 @@ const productSchema = new mongoose.Schema(
     badges: [{ type: String }],
     frequentlyBoughtWith: [{ type: String }],
     relatedIds: [{ type: String }],
-    imageUrl: { type: String, default: "" }
+    imageUrl: { type: String, default: "" },
+    images: [{ type: String }]
   },
   { timestamps: true }
 );
