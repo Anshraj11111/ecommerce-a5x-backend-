@@ -198,4 +198,37 @@ router.use((error, _req, res, _next) => {
   });
 });
 
+// POST /api/auth/make-admin - Set user role to admin by email (secured with admin secret)
+router.post("/make-admin", async (req, res) => {
+  try {
+    const { email, secret } = req.body;
+    
+    // Verify admin secret to prevent unauthorized access
+    const adminSecret = process.env.ADMIN_SETUP_SECRET || 'a5x-admin-setup-2026';
+    if (secret !== adminSecret) {
+      return res.status(403).json({ error: 'Invalid secret' });
+    }
+    
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found', email });
+    }
+    
+    user.role = 'admin';
+    await user.save();
+    
+    // Generate new token with admin role
+    const token = generateToken(user._id, user.username, 'admin');
+    
+    res.json({ 
+      success: true, 
+      message: `User ${email} is now admin`,
+      token,
+      user: { id: user._id, username: user.username, email: user.email, role: user.role }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;
