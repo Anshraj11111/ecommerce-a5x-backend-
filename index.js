@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import morgan from "morgan";
+import passport from "passport";
 import productRoutes from "./routes/products.js";
 import kitRoutes from "./routes/kits.js";
 import courseRoutes from "./routes/courses.js";
@@ -14,8 +15,10 @@ import contactRoutes from "./routes/contacts.js";
 import logger from "./utils/logger.js";
 import { seedDatabase } from "./utils/seeder.js";
 import { testEmailConfig, sendOrderConfirmationEmail } from "./services/emailService.js";
+import { initGoogleStrategy } from "./config/passport.js";
 
-dotenv.config();
+dotenv.config(); // Load .env variables
+initGoogleStrategy(); // Init Google OAuth AFTER dotenv
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -42,6 +45,9 @@ app.use(helmet({
 // Body parser middleware
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
+
+// Passport middleware (for Google OAuth)
+app.use(passport.initialize());
 
 // Logging
 app.use(morgan("combined"));

@@ -1,10 +1,37 @@
 import express from "express";
+import passport from "passport";
 import User from "../models/User.js";
 import mongoose from "mongoose";
 import { generateToken, authenticateToken } from "../middleware/auth.js";
 import { validate, schemas } from "../middleware/validation.js";
 
 const router = express.Router();
+
+// ── Google OAuth Routes ────────────────────────────────────────────────────
+
+// GET /api/auth/google - Initiate Google OAuth
+router.get("/google", passport.authenticate("google", {
+  scope: ["profile", "email"],
+  session: false
+}));
+
+// GET /api/auth/google/callback - Google OAuth callback
+router.get("/google/callback",
+  passport.authenticate("google", { session: false, failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=google_failed` }),
+  (req, res) => {
+    try {
+      const user = req.user;
+      const token = generateToken(user._id, user.username, user.role);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+      // Redirect to frontend with token
+      res.redirect(`${frontendUrl}/auth/google/success?token=${token}&userId=${user._id}&username=${encodeURIComponent(user.username)}&email=${encodeURIComponent(user.email)}&role=${user.role}`);
+    } catch (error) {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      res.redirect(`${frontendUrl}/login?error=token_failed`);
+    }
+  }
+);
 
 // POST signup
 router.post("/signup", validate(schemas.signup), async (req, res, next) => {

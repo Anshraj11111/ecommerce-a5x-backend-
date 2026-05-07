@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "node --env-file=.env index.js",
+    "dev": "nodemon --env-file=.env index.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -21,6 +21,8 @@
     "morgan": "^1.10.1",
     "nodemailer": "^6.9.0",
     "nodemon": "^3.1.9",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
     "resend": "^6.12.2"
   }
 }
