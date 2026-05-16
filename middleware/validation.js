@@ -55,10 +55,20 @@ export const schemas = {
     description: Joi.string().required(),
     includes: Joi.array().items(Joi.string()),
     rating: Joi.number().min(0).max(5),
-    imageUrl: Joi.string(),
+    imageUrl: Joi.string().allow(''),
     images: Joi.array().items(Joi.string()),
     videoUrl: Joi.string().allow(''),
-    videoDuration: Joi.number().min(0)
+    videoDuration: Joi.number().min(0),
+    // Additional tab fields
+    overview: Joi.string().allow(''),
+    features: Joi.array().items(Joi.string()),
+    dimensions: Joi.string().allow(''),
+    weight: Joi.string().allow(''),
+    power: Joi.string().allow(''),
+    temperature: Joi.string().allow(''),
+    compatibility: Joi.array().items(Joi.string()),
+    software: Joi.array().items(Joi.string()),
+    isPublished: Joi.boolean()
   }),
 
   course: Joi.object({

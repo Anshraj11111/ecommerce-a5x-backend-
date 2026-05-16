@@ -25,11 +25,17 @@ export async function seedDatabase() {
     if (productCount > 0 || kitCount > 0 || courseCount > 0) {
       console.log(`Database already seeded: ${productCount} products, ${kitCount} kits, ${courseCount} courses, ${userCount} users`);
       
-      // Check if admin user exists, if not create one
-      const adminUser = await User.findOne({ role: "admin" });
+      // Always ensure admin user exists with correct role
+      const adminEmail = process.env.ADMIN_EMAIL || "admin@a5xrobotics.com";
+      const adminUser = await User.findOne({ email: adminEmail });
       if (!adminUser) {
         console.log("No admin user found. Creating default admin...");
         await createDefaultAdmin();
+      } else if (adminUser.role !== 'admin') {
+        // Fix role if it's wrong
+        adminUser.role = 'admin';
+        await adminUser.save();
+        console.log(`✅ Fixed admin role for ${adminEmail}`);
       }
       
       return false;

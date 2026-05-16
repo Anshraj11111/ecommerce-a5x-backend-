@@ -12,6 +12,7 @@ import courseRoutes from "./routes/courses.js";
 import authRoutes from "./routes/auth.js";
 import orderRoutes from "./routes/orders.js";
 import contactRoutes from "./routes/contacts.js";
+import reviewRoutes from "./routes/reviews.js";
 import logger from "./utils/logger.js";
 import { seedDatabase } from "./utils/seeder.js";
 import { testEmailConfig, sendOrderConfirmationEmail } from "./services/emailService.js";
@@ -118,6 +119,7 @@ app.use("/api/kits", kitRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/contacts", contactRoutes);
+app.use("/api/reviews", reviewRoutes);
 
 // API root response
 app.get("/", (_req, res) => {
@@ -157,8 +159,17 @@ async function start() {
     console.warn("MONGODB_URI not set, using JSON fallback storage");
   }
 
-  app.listen(port, () => {
+  const server = app.listen(port, () => {
     console.log(`A5X server running on http://localhost:${port}`);
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`❌ Port ${port} is already in use. Please kill the existing process and restart.`);
+      process.exit(1);
+    } else {
+      throw err;
+    }
   });
 }
 

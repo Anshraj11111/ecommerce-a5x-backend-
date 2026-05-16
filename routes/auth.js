@@ -215,6 +215,10 @@ router.post("/make-admin", async (req, res) => {
     }
     
     user.role = 'admin';
+    // Also unlock the account and reset login attempts
+    user.loginAttempts = 0;
+    user.lockUntil = null;
+    user.isActive = true;
     await user.save();
     
     // Generate new token with admin role

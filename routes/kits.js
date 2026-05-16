@@ -118,7 +118,16 @@ router.post("/", authenticateToken, authorizeRole(["admin"]), validate(schemas.k
       imageUrl: req.validatedData.imageUrl || "",
       images: req.validatedData.images || [],
       videoUrl: req.validatedData.videoUrl || "",
-      videoDuration: req.validatedData.videoDuration || 0
+      videoDuration: req.validatedData.videoDuration || 0,
+      overview: req.validatedData.overview || "",
+      features: req.validatedData.features || [],
+      dimensions: req.validatedData.dimensions || "",
+      weight: req.validatedData.weight || "",
+      power: req.validatedData.power || "",
+      temperature: req.validatedData.temperature || "",
+      compatibility: req.validatedData.compatibility || [],
+      software: req.validatedData.software || [],
+      isPublished: req.validatedData.isPublished !== undefined ? req.validatedData.isPublished : true
     };
 
     if (dbReady()) {
@@ -139,22 +148,13 @@ router.post("/", authenticateToken, authorizeRole(["admin"]), validate(schemas.k
 // PUT update kit (Admin only)
 router.put("/:id", authenticateToken, authorizeRole(["admin"]), validate(schemas.kit), async (req, res, next) => {
   try {
-    console.log('=== BACKEND PUT /api/kits/:id ===');
-    console.log('Kit ID:', req.params.id);
-    console.log('Request body images:', req.body.images);
-    console.log('Request body images length:', req.body.images?.length);
-    console.log('Validated data images:', req.validatedData.images);
-    console.log('Validated data images length:', req.validatedData.images?.length);
-    
     if (dbReady()) {
-      const updated = await Kit.findOneAndUpdate({ id: req.params.id }, req.validatedData, { new: true });
+      const updated = await Kit.findOneAndUpdate(
+        { id: req.params.id }, 
+        { $set: req.validatedData }, 
+        { new: true, runValidators: true }
+      );
       if (!updated) return res.status(404).json({ error: "Kit not found", code: "NOT_FOUND" });
-      
-      console.log('MongoDB updated kit ID:', updated.id);
-      console.log('MongoDB updated kit images:', updated.images);
-      console.log('MongoDB updated kit images length:', updated.images?.length);
-      console.log('=== END BACKEND PUT ===');
-      
       res.json(updated);
       return;
     }
@@ -163,7 +163,6 @@ router.put("/:id", authenticateToken, authorizeRole(["admin"]), validate(schemas
     if (index === -1) return res.status(404).json({ error: "Kit not found", code: "NOT_FOUND" });
     kits[index] = { ...kits[index], ...req.validatedData };
     await writeFallback(kits);
-    
     res.json(kits[index]);
   } catch (error) {
     next(error);
