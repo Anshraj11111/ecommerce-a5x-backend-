@@ -66,6 +66,7 @@ export const schemas = {
     description: Joi.string().required(),
     includes: Joi.array().items(Joi.string()),
     rating: Joi.number().min(0).max(5),
+    ageGroup: Joi.string().valid('8-12 yrs', '12-16 yrs', '16+ yrs').allow(''),
     imageUrl: Joi.string().allow(''),
     images: Joi.array().items(Joi.string()),
     videoUrl: Joi.string().allow(''),
