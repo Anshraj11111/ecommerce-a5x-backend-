@@ -6,6 +6,7 @@ const kitSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     tier: { type: String, required: true },
     price: { type: Number, required: true },
+    mrp: { type: Number, default: 0 },
     description: { type: String, required: true },
     includes: [{ type: String }],
     rating: { type: Number, default: 4.5 },

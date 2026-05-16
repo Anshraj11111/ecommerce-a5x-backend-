@@ -26,6 +26,13 @@ const productSchema = new mongoose.Schema(
     features: [{ type: String }],
     specs: { type: mongoose.Schema.Types.Mixed, default: {} },
     compatibility: [{ type: String }],
+    // New tab fields
+    overview: { type: String, default: "" },
+    dimensions: { type: String, default: "" },
+    weight: { type: String, default: "" },
+    power: { type: String, default: "" },
+    temperature: { type: String, default: "" },
+    software: [{ type: String }],
     bulkPricing: [bulkPricingSchema],
     badges: [{ type: String }],
     frequentlyBoughtWith: [{ type: String }],

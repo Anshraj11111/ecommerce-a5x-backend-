@@ -29,10 +29,17 @@ export const schemas = {
     reviewCount: Joi.number().min(0),
     inStock: Joi.boolean(),
     stockCount: Joi.number().min(0),
-    shortDescription: Joi.string(),
+    shortDescription: Joi.string().allow(''),
+    description: Joi.string().allow(''),
+    overview: Joi.string().allow(''),
     features: Joi.array().items(Joi.string()),
     specs: Joi.object(),
+    dimensions: Joi.string().allow(''),
+    weight: Joi.string().allow(''),
+    power: Joi.string().allow(''),
+    temperature: Joi.string().allow(''),
     compatibility: Joi.array().items(Joi.string()),
+    software: Joi.array().items(Joi.string()),
     bulkPricing: Joi.array().items(
       Joi.object({
         min: Joi.number().required(),
@@ -43,8 +50,11 @@ export const schemas = {
     badges: Joi.array().items(Joi.string()),
     frequentlyBoughtWith: Joi.array().items(Joi.string()),
     relatedIds: Joi.array().items(Joi.string()),
-    imageUrl: Joi.string(),
-    images: Joi.array().items(Joi.string())
+    imageUrl: Joi.string().allow(''),
+    images: Joi.array().items(Joi.string()),
+    tags: Joi.string().allow(''),
+    quickDelivery: Joi.boolean(),
+    deliveryType: Joi.string().allow('')
   }),
 
   kit: Joi.object({
@@ -52,6 +62,7 @@ export const schemas = {
     name: Joi.string().required(),
     tier: Joi.string().required(),
     price: Joi.number().positive().required(),
+    mrp: Joi.number().min(0),
     description: Joi.string().required(),
     includes: Joi.array().items(Joi.string()),
     rating: Joi.number().min(0).max(5),

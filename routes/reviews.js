@@ -19,6 +19,20 @@ router.get('/kit/:kitId', async (req, res) => {
   }
 });
 
+// Get reviews for a specific product (only approved ones for public)
+router.get('/product/:productId', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const reviews = await Review.find({ kitId: `product-${productId}`, approved: true })
+      .sort({ createdAt: -1 })
+      .select('-email -approvedBy');
+    res.json(reviews);
+  } catch (error) {
+    console.error('Error fetching product reviews:', error);
+    res.status(500).json({ error: 'Failed to fetch reviews' });
+  }
+});
+
 // Submit a new review
 router.post('/submit', async (req, res) => {
   try {

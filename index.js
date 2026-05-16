@@ -13,6 +13,7 @@ import authRoutes from "./routes/auth.js";
 import orderRoutes from "./routes/orders.js";
 import contactRoutes from "./routes/contacts.js";
 import reviewRoutes from "./routes/reviews.js";
+import aiRoutes from "./routes/ai.js";
 import logger from "./utils/logger.js";
 import { seedDatabase } from "./utils/seeder.js";
 import { testEmailConfig, sendOrderConfirmationEmail } from "./services/emailService.js";
@@ -43,9 +44,9 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// Body parser middleware
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ limit: "10mb", extended: true }));
+// Body parser middleware - 50mb to support up to 10 base64 images per request
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Passport middleware (for Google OAuth)
 app.use(passport.initialize());
@@ -59,8 +60,8 @@ app.set("trust proxy", 1);
 // Rate Limiting
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || 900000), // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || 100), // limit each IP to 100 requests per windowMs
-  message: "Too many requests from this IP, please try again later.",
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || 500), // limit each IP to 500 requests per windowMs
+  message: { error: "Too many requests from this IP, please try again later.", code: "RATE_LIMITED" },
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => req.path === "/api/health" // Don't count health checks
@@ -120,6 +121,7 @@ app.use("/api/courses", courseRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/contacts", contactRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/ai", aiRoutes);
 
 // API root response
 app.get("/", (_req, res) => {
