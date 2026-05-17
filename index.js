@@ -25,15 +25,31 @@ initGoogleStrategy(); // Init Google OAuth AFTER dotenv
 const app = express();
 const port = process.env.PORT || 3001;
 
-// CORS Configuration - Allow Vercel frontend
+// CORS Configuration
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+  : [];
+
+// Always include these defaults
+const defaultOrigins = [
+  'https://shop.a5x.in',
+  'https://www.shop.a5x.in',
+  'https://ecommerce-a5x-frontend.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174'
+];
+
+const corsOrigins = [...new Set([...defaultOrigins, ...allowedOrigins])];
+
 app.use(cors({
-  origin: [
-    'https://ecommerce-a5x-frontend.vercel.app',
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:5174'
-  ],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    if (corsOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
