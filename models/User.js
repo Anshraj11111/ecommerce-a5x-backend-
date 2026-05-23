@@ -76,7 +76,7 @@ userSchema.methods.comparePassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Method to handle login attempts
+// Method to handle login attempts — locks after 10 failed attempts for 5 minutes
 userSchema.methods.incLoginAttempts = function() {
   // Reset attempts if lock has expired
   if (this.lockUntil && this.lockUntil < Date.now()) {
@@ -84,11 +84,18 @@ userSchema.methods.incLoginAttempts = function() {
       $set: { loginAttempts: 1, lockUntil: null }
     });
   }
-  
-  // Increment attempts
+
+  const newAttempts = (this.loginAttempts || 0) + 1;
+
+  // Lock only after 10 failed attempts
+  if (newAttempts >= 10) {
+    return this.updateOne({
+      $set: { loginAttempts: newAttempts, lockUntil: Date.now() + 5 * 60 * 1000 } // 5 minutes
+    });
+  }
+
   return this.updateOne({
-    $inc: { loginAttempts: 1 },
-    $set: { lockUntil: Date.now() + 30 * 60 * 1000 } // 30 minutes
+    $set: { loginAttempts: newAttempts }
   });
 };
 

@@ -113,10 +113,13 @@ router.post("/login", validate(schemas.login), async (req, res, next) => {
 
     // Check if account is locked
     if (user.isLocked()) {
+      const remainingMs = user.lockUntil - Date.now();
+      const remainingMin = Math.ceil(remainingMs / 60000);
       console.log('Login failed: Account locked');
       return res.status(429).json({ 
-        error: "Account locked due to too many login attempts. Try again later.",
-        code: "ACCOUNT_LOCKED"
+        error: `Account locked due to too many login attempts. Try again in ${remainingMin} minute${remainingMin !== 1 ? 's' : ''}.`,
+        code: "ACCOUNT_LOCKED",
+        lockUntil: user.lockUntil
       });
     }
 
