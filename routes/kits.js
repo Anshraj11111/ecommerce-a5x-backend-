@@ -43,9 +43,10 @@ router.get("/", async (req, res, next) => {
     if (dbReady()) {
       const total = await Kit.countDocuments();
       const kits = await Kit.find()
-        .sort({ createdAt: -1 })
+        .sort({ _id: -1 })
         .skip(skip)
-        .limit(parseInt(limit));
+        .limit(parseInt(limit))
+        .lean();
       
       const response = {
         data: kits,

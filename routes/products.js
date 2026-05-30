@@ -40,10 +40,10 @@ router.get("/", async (req, res, next) => {
       console.log(`[Products GET] Found ${total} products in database`);
       
       const products = await Product.find(filter)
-        .sort({ createdAt: -1 })
+        .sort({ _id: -1 })
         .skip(skip)
         .limit(parseInt(limit))
-        .lean(); // Use lean() for better performance
+        .lean();
       
       console.log(`[Products GET] Fetched ${products.length} products`);
       
