@@ -6,6 +6,7 @@ import Kit from "../models/Kit.js";
 import { fileURLToPath } from "url";
 import { authenticateToken, authorizeRole } from "../middleware/auth.js";
 import { validate, schemas } from "../middleware/validation.js";
+import { uploadImage, uploadImages } from "../services/cloudinaryService.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const kitsFilePath = path.join(__dirname, "../data/kits.json");
@@ -108,16 +109,22 @@ router.get("/:id", async (req, res, next) => {
 // POST create kit (Admin only)
 router.post("/", authenticateToken, authorizeRole(["admin"]), validate(schemas.kit), async (req, res, next) => {
   try {
+    const kitId = req.validatedData.id || `kit-${Date.now()}`;
+
+    // Upload images to Cloudinary if base64
+    const imageUrl = await uploadImage(req.validatedData.imageUrl || "", `kit-${kitId}`, 'kits');
+    const images = await uploadImages(req.validatedData.images || [], `kit-${kitId}`, 'kits');
+
     const kit = {
-      id: req.validatedData.id || `kit-${Date.now()}`,
+      id: kitId,
       name: req.validatedData.name,
       tier: req.validatedData.tier,
       price: req.validatedData.price || 0,
       description: req.validatedData.description || "",
       includes: req.validatedData.includes || [],
       rating: req.validatedData.rating || 4.5,
-      imageUrl: req.validatedData.imageUrl || "",
-      images: req.validatedData.images || [],
+      imageUrl,
+      images,
       videoUrl: req.validatedData.videoUrl || "",
       videoDuration: req.validatedData.videoDuration || 0,
       overview: req.validatedData.overview || "",
@@ -149,10 +156,15 @@ router.post("/", authenticateToken, authorizeRole(["admin"]), validate(schemas.k
 // PUT update kit (Admin only)
 router.put("/:id", authenticateToken, authorizeRole(["admin"]), validate(schemas.kit), async (req, res, next) => {
   try {
+    // Upload images to Cloudinary if base64
+    const imageUrl = await uploadImage(req.validatedData.imageUrl || "", `kit-${req.params.id}`, 'kits');
+    const images = await uploadImages(req.validatedData.images || [], `kit-${req.params.id}`, 'kits');
+    const updateData = { ...req.validatedData, imageUrl, images };
+
     if (dbReady()) {
       const updated = await Kit.findOneAndUpdate(
         { id: req.params.id }, 
-        { $set: req.validatedData }, 
+        { $set: updateData }, 
         { new: true, runValidators: true }
       );
       if (!updated) return res.status(404).json({ error: "Kit not found", code: "NOT_FOUND" });
@@ -162,7 +174,7 @@ router.put("/:id", authenticateToken, authorizeRole(["admin"]), validate(schemas
     const kits = await readFallback();
     const index = kits.findIndex(k => k.id === req.params.id);
     if (index === -1) return res.status(404).json({ error: "Kit not found", code: "NOT_FOUND" });
-    kits[index] = { ...kits[index], ...req.validatedData };
+    kits[index] = { ...kits[index], ...updateData };
     await writeFallback(kits);
     res.json(kits[index]);
   } catch (error) {

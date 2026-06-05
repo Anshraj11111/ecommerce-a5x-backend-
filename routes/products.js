@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import Product from "../models/Product.js";
 import { authenticateToken, authorizeRole } from "../middleware/auth.js";
 import { validate, schemas } from "../middleware/validation.js";
+import { uploadImage, uploadImages } from "../services/cloudinaryService.js";
 
 const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
@@ -110,8 +111,14 @@ router.get("/:id", async (req, res, next) => {
 // POST create product (Admin only)
 router.post("/", authenticateToken, authorizeRole(["admin"]), validate(schemas.product), async (req, res, next) => {
   try {
+    const productId = req.validatedData.id || `product-${Date.now()}`;
+
+    // Upload images to Cloudinary if base64
+    const imageUrl = await uploadImage(req.validatedData.imageUrl || "", `product-${productId}`, 'products');
+    const images = await uploadImages(req.validatedData.images || [], `product-${productId}`, 'products');
+
     const product = {
-      id: req.validatedData.id || `product-${Date.now()}`,
+      id: productId,
       name: req.validatedData.name,
       price: req.validatedData.price || 0,
       mrp: req.validatedData.mrp || 0,
@@ -130,7 +137,8 @@ router.post("/", authenticateToken, authorizeRole(["admin"]), validate(schemas.p
       badges: req.validatedData.badges || [],
       frequentlyBoughtWith: req.validatedData.frequentlyBoughtWith || [],
       relatedIds: req.validatedData.relatedIds || [],
-      imageUrl: req.validatedData.imageUrl || ""
+      imageUrl,
+      images
     };
 
     if (dbReady()) {
@@ -223,8 +231,13 @@ router.post("/bulk", authenticateToken, authorizeRole(["admin"]), async (req, re
 // PUT update product (Admin only)
 router.put("/:id", authenticateToken, authorizeRole(["admin"]), validate(schemas.product), async (req, res, next) => {
   try {
+    // Upload images to Cloudinary if base64
+    const imageUrl = await uploadImage(req.validatedData.imageUrl || "", `product-${req.params.id}`, 'products');
+    const images = await uploadImages(req.validatedData.images || [], `product-${req.params.id}`, 'products');
+    const updateData = { ...req.validatedData, imageUrl, images };
+
     if (dbReady()) {
-      const updated = await Product.findOneAndUpdate({ id: req.params.id }, req.validatedData, { new: true });
+      const updated = await Product.findOneAndUpdate({ id: req.params.id }, updateData, { new: true });
       if (!updated) return res.status(404).json({ error: "Product not found", code: "NOT_FOUND" });
       
       res.json(updated);
@@ -234,7 +247,7 @@ router.put("/:id", authenticateToken, authorizeRole(["admin"]), validate(schemas
     const products = await readFallback();
     const index = products.findIndex((p) => p.id === req.params.id);
     if (index === -1) return res.status(404).json({ error: "Product not found", code: "NOT_FOUND" });
-    products[index] = { ...products[index], ...req.validatedData };
+    products[index] = { ...products[index], ...updateData };
     await writeFallback(products);
     
     res.json(products[index]);

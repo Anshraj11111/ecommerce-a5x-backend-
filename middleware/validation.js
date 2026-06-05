@@ -52,7 +52,10 @@ export const schemas = {
     relatedIds: Joi.array().items(Joi.string()),
     imageUrl: Joi.string().allow(''),
     images: Joi.array().items(Joi.string()),
-    tags: Joi.string().allow(''),
+    tags: Joi.alternatives().try(
+      Joi.array().items(Joi.string()),
+      Joi.string().allow('')
+    ),
     quickDelivery: Joi.boolean(),
     deliveryType: Joi.string().allow('')
   }),
