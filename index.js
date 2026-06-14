@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import express from "express";
 import mongoose from "mongoose";
 import helmet from "helmet";
+import compression from "compression";
 import rateLimit from "express-rate-limit";
 import morgan from "morgan";
 import passport from "passport";
@@ -59,6 +60,9 @@ app.use(cors({
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
+
+// Gzip compression — reduces response size by ~70%
+app.use(compression());
 
 // Body parser middleware - 50mb to support up to 10 base64 images per request
 app.use(express.json({ limit: "50mb" }));
