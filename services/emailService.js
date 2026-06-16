@@ -204,3 +204,102 @@ export async function sendShippingEmail(order) {
     console.error('❌ Shipping email failed:', err.message);
   }
 }
+
+/**
+ * Send order cancellation email to customer
+ */
+export async function sendCancellationEmail(order, reason = '') {
+  const resend = getResend();
+  if (!resend) {
+    console.error('❌ RESEND_API_KEY not configured — skipping cancellation email');
+    return;
+  }
+
+  const cancelReason = reason || 'The order was cancelled by our team. If you have any questions, please contact us.';
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+    .header { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; padding: 32px; text-align: center; }
+    .header h1 { margin: 0; font-size: 28px; }
+    .header p { margin: 8px 0 0; opacity: 0.9; }
+    .body { padding: 32px; }
+    .order-box { background: #fef2f2; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #ef4444; }
+    .order-number { font-size: 22px; font-weight: bold; color: #dc2626; }
+    .reason-box { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 16px; margin: 16px 0; }
+    .item { padding: 10px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+    .total-row { font-size: 18px; font-weight: bold; color: #374151; margin-top: 12px; display: flex; justify-content: space-between; }
+    .footer { text-align: center; padding: 20px; background: #f8f9fa; color: #888; font-size: 12px; }
+    .cta-btn { display: inline-block; background: #1a6ef5; color: white; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>❌ Order Cancelled</h1>
+      <p>We're sorry to inform you about this cancellation</p>
+    </div>
+    <div class="body">
+      <p>Dear <strong>${order.customerName}</strong>,</p>
+      <p>We regret to inform you that your order has been cancelled.</p>
+
+      <div class="order-box">
+        <div class="order-number">Order #${order.orderNumber}</div>
+        <p style="margin:4px 0 0; color:#666; font-size:13px;">Placed on ${new Date(order.createdAt || Date.now()).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+      </div>
+
+      <div class="reason-box">
+        <strong>📋 Reason for Cancellation:</strong><br>
+        <p style="margin:8px 0 0; color:#92400e;">${cancelReason}</p>
+      </div>
+
+      <h3 style="margin-bottom:8px;">Cancelled Items</h3>
+      ${order.items.map(item => `
+        <div class="item">
+          <span><strong>${item.name}</strong> × ${item.quantity}</span>
+          <span>₹${item.price * item.quantity}</span>
+        </div>
+      `).join('')}
+      <div class="total-row">
+        <span>Order Total</span>
+        <span>₹${order.total}</span>
+      </div>
+
+      <p style="margin-top:24px;">If you paid online, a full refund will be processed within <strong>5-7 business days</strong> to your original payment method.</p>
+
+      <p>We apologize for any inconvenience caused. Feel free to place a new order or contact us if you need assistance.</p>
+
+      <a href="https://shop.a5x.in/shop" class="cta-btn">Browse Products</a>
+
+      <p style="margin-top:24px;">Thank you for your understanding,<br><strong>A5X Industries Team</strong> 🤖</p>
+    </div>
+    <div class="footer">
+      <p>A5X Industries — Premium Robotics Components</p>
+      <p>For support, reply to this email or visit <a href="https://shop.a5x.in">shop.a5x.in</a></p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: getSender(),
+      to: order.customerEmail,
+      reply_to: process.env.EMAIL_USER || 'anshrajbaghel30@gmail.com',
+      subject: `❌ Order Cancelled — #${order.orderNumber} | A5X Robotics`,
+      html
+    });
+
+    if (error) {
+      console.error('❌ Resend cancellation email error:', error);
+    } else {
+      console.log(`✅ Cancellation email sent to ${order.customerEmail} (id: ${data?.id})`);
+    }
+  } catch (err) {
+    console.error('❌ Cancellation email failed:', err.message);
+  }
+}

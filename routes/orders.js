@@ -5,7 +5,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import Order from '../models/Order.js';
 import { authenticateToken, authorizeRole } from '../middleware/auth.js';
-import { sendOrderConfirmationEmail, sendShippingEmail } from '../services/emailService.js';
+import { sendOrderConfirmationEmail, sendShippingEmail, sendCancellationEmail } from '../services/emailService.js';
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -192,6 +192,8 @@ router.patch('/:id/status', authenticateToken, authorizeRole(['admin']), async (
         sendOrderConfirmationEmail(order).catch(e => console.error('Email error:', e.message));
       } else if (status === 'shipped') {
         sendShippingEmail(order).catch(e => console.error('Email error:', e.message));
+      } else if (status === 'cancelled') {
+        sendCancellationEmail(order, adminNotes || '').catch(e => console.error('Email error:', e.message));
       }
 
       return res.json({ success: true, message: 'Order updated successfully', order });
@@ -208,6 +210,7 @@ router.patch('/:id/status', authenticateToken, authorizeRole(['admin']), async (
       if (status === 'confirmed' && !order.confirmedAt) order.confirmedAt = now.toISOString();
       else if (status === 'shipped' && !order.shippedAt) order.shippedAt = now.toISOString();
       else if (status === 'delivered' && !order.deliveredAt) order.deliveredAt = now.toISOString();
+      else if (status === 'cancelled' && !order.cancelledAt) order.cancelledAt = now.toISOString();
     }
     if (trackingNumber) order.trackingNumber = trackingNumber;
     if (adminNotes) order.adminNotes = adminNotes;
@@ -221,6 +224,8 @@ router.patch('/:id/status', authenticateToken, authorizeRole(['admin']), async (
       sendOrderConfirmationEmail(order).catch(e => console.error('Email error:', e.message));
     } else if (status === 'shipped') {
       sendShippingEmail(order).catch(e => console.error('Email error:', e.message));
+    } else if (status === 'cancelled') {
+      sendCancellationEmail(order, adminNotes || '').catch(e => console.error('Email error:', e.message));
     }
 
     return res.json({ success: true, message: 'Order updated successfully', order });
