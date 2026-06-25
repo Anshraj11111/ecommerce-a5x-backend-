@@ -5,7 +5,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import Order from '../models/Order.js';
 import { authenticateToken, authorizeRole } from '../middleware/auth.js';
-import { sendOrderConfirmationEmail, sendShippingEmail, sendCancellationEmail } from '../services/emailService.js';
+import { sendOrderConfirmationEmail, sendShippingEmail, sendCancellationEmail, sendAdminNewOrderAlert } from '../services/emailService.js';
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -83,6 +83,10 @@ router.post('/', async (req, res) => {
         paymentMethod: paymentMethod || 'cod', customerNotes
       });
       await order.save();
+
+      // Alert admin immediately when new order arrives
+      sendAdminNewOrderAlert(order).catch(e => console.error('Admin alert error:', e.message));
+
       return res.status(201).json({
         success: true,
         message: 'Order placed successfully',
@@ -106,6 +110,9 @@ router.post('/', async (req, res) => {
     };
     orders.unshift(newOrder);
     await writeOrdersFallback(orders);
+
+    // Alert admin immediately when new order arrives
+    sendAdminNewOrderAlert(newOrder).catch(e => console.error('Admin alert error:', e.message));
 
     return res.status(201).json({
       success: true,

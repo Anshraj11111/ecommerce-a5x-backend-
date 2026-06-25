@@ -206,8 +206,137 @@ export async function sendShippingEmail(order) {
 }
 
 /**
- * Send order cancellation email to customer
+ * Send new order alert to admin/owner when any order is placed
  */
+export async function sendAdminNewOrderAlert(order) {
+  const resend = getResend();
+  if (!resend) return;
+
+  const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'anshrajbaghel30@gmail.com';
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+    .header { background: linear-gradient(135deg, #1a6ef5, #0d4ed4); color: white; padding: 28px 32px; }
+    .header h1 { margin: 0; font-size: 24px; }
+    .header p { margin: 6px 0 0; opacity: 0.85; font-size: 14px; }
+    .body { padding: 28px 32px; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
+    .info-box { background: #f8f9fa; border-radius: 8px; padding: 14px 16px; }
+    .info-box .label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 4px; }
+    .info-box .value { font-size: 15px; font-weight: 600; color: #1a1a1a; }
+    .order-num { font-size: 20px; font-weight: 800; color: #1a6ef5; }
+    .items-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    .items-table th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; padding: 8px 0; border-bottom: 2px solid #e2e8f0; }
+    .items-table td { padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+    .total-row { font-size: 17px; font-weight: 800; color: #1a6ef5; padding-top: 12px !important; border-bottom: none !important; }
+    .address-box { background: #eff6ff; border-left: 3px solid #1a6ef5; border-radius: 0 8px 8px 0; padding: 14px 16px; margin: 16px 0; font-size: 14px; line-height: 1.7; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+    .badge-cod { background: #fef3c7; color: #d97706; }
+    .badge-online { background: #d1fae5; color: #065f46; }
+    .cta-btn { display: inline-block; background: #1a6ef5; color: white !important; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px; margin-top: 20px; }
+    .footer { text-align: center; padding: 18px; background: #f8f9fa; color: #aaa; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🛒 New Order Received!</h1>
+      <p>A new order has been placed on A5X Robotics</p>
+    </div>
+    <div class="body">
+      <div class="order-num">#${order.orderNumber}</div>
+      <p style="margin:4px 0 16px; color:#666; font-size:13px;">
+        Placed at ${new Date(order.createdAt || Date.now()).toLocaleString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+      </p>
+
+      <div class="info-grid">
+        <div class="info-box">
+          <div class="label">Customer</div>
+          <div class="value">${order.customerName}</div>
+        </div>
+        <div class="info-box">
+          <div class="label">Phone</div>
+          <div class="value">${order.customerPhone}</div>
+        </div>
+        <div class="info-box">
+          <div class="label">Email</div>
+          <div class="value" style="font-size:13px;">${order.customerEmail}</div>
+        </div>
+        <div class="info-box">
+          <div class="label">Payment</div>
+          <div class="value">
+            <span class="badge ${(order.paymentMethod || 'cod') === 'cod' ? 'badge-cod' : 'badge-online'}">
+              ${(order.paymentMethod || 'COD').toUpperCase()}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th style="text-align:center;">Qty</th>
+            <th style="text-align:right;">Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${order.items.map(item => `
+            <tr>
+              <td><strong>${item.name}</strong></td>
+              <td style="text-align:center;">×${item.quantity}</td>
+              <td style="text-align:right;">₹${(item.price * item.quantity).toLocaleString('en-IN')}</td>
+            </tr>
+          `).join('')}
+          <tr>
+            <td class="total-row" colspan="2">Order Total</td>
+            <td class="total-row" style="text-align:right;">₹${Number(order.total).toLocaleString('en-IN')}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="address-box">
+        <strong>📦 Ship to:</strong><br>
+        ${order.address.street}<br>
+        ${order.address.city}, ${order.address.state} — ${order.address.pincode}
+        ${order.address.landmark ? `<br>Landmark: ${order.address.landmark}` : ''}
+      </div>
+
+      ${order.customerNotes ? `<p style="background:#fffbeb; border-radius:8px; padding:12px 16px; font-size:14px;"><strong>📝 Customer Note:</strong> ${order.customerNotes}</p>` : ''}
+
+      <a href="${process.env.ADMIN_PANEL_URL || 'https://shop.a5x.in/admin'}/orders" class="cta-btn">View in Admin Panel →</a>
+    </div>
+    <div class="footer">
+      <p>A5X Industries — Admin Alert</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: getSender(),
+      to: adminEmail,
+      subject: `🛒 New Order #${order.orderNumber} — ₹${Number(order.total).toLocaleString('en-IN')} from ${order.customerName}`,
+      html
+    });
+
+    if (error) {
+      console.error('❌ Admin alert email error:', error);
+    } else {
+      console.log(`✅ Admin order alert sent to ${adminEmail} (id: ${data?.id})`);
+    }
+  } catch (err) {
+    console.error('❌ Admin alert email failed:', err.message);
+  }
+}
+
+
 export async function sendCancellationEmail(order, reason = '') {
   const resend = getResend();
   if (!resend) {
