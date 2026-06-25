@@ -181,18 +181,30 @@ async function start() {
     console.warn("MONGODB_URI not set, using JSON fallback storage");
   }
 
-  const server = app.listen(port, () => {
-    console.log(`A5X server running on http://localhost:${port}`);
-  });
+  // Try the configured port, then fallback to next available ports
+  const tryListen = (portToTry) => {
+    const server = app.listen(portToTry);
 
-  server.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      console.error(`❌ Port ${port} is already in use. Please kill the existing process and restart.`);
-      process.exit(1);
-    } else {
-      throw err;
-    }
-  });
+    server.on('listening', () => {
+      console.log(`✅ A5X server running on http://localhost:${portToTry}`);
+      if (portToTry !== Number(port)) {
+        console.warn(`⚠️  Note: configured port ${port} was busy, using ${portToTry} instead.`);
+      }
+    });
+
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.warn(`⚠️  Port ${portToTry} is busy, trying ${portToTry + 1}...`);
+        server.close();
+        tryListen(portToTry + 1);
+      } else {
+        console.error('Server error:', err);
+        process.exit(1);
+      }
+    });
+  };
+
+  tryListen(Number(port));
 }
 
 start();
