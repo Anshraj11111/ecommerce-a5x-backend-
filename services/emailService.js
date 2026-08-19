@@ -1,45 +1,61 @@
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 
 /**
- * Email Service using Resend (works on Render — uses HTTPS not SMTP)
+ * Email Service using Nodemailer with Gmail SMTP
  *
  * Setup:
- * 1. Go to https://resend.com and sign up (free — 3000 emails/month)
- * 2. Create an API key
- * 3. Add to Render env vars:  RESEND_API_KEY=re_xxxxxxxxxxxx
- * 4. Verify your sender domain OR use onboarding@resend.dev for testing
+ * 1. Gmail account pe jao
+ * 2. App Password generate karo (2FA enable hona chahiye)
+ * 3. .env mein add karo:
+ *    EMAIL_USER=your-email@gmail.com
+ *    EMAIL_PASS=your-app-password
  */
 
-function getResend() {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) return null;
-  return new Resend(key);
+function getTransporter() {
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS;
+  
+  if (!user || !pass) {
+    console.error('❌ EMAIL_USER or EMAIL_PASS not set in .env');
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user, pass }
+  });
 }
 
-// Sender address — use your verified domain or Resend's test address
 function getSender() {
-  return process.env.EMAIL_FROM || 'A5X Industries <onboarding@resend.dev>';
+  return process.env.EMAIL_FROM || `A5X Industries <${process.env.EMAIL_USER}>`;
 }
+
 /**
  * Test email configuration
  */
 export async function testEmailConfig() {
-  const resend = getResend();
-  if (!resend) {
-    console.error('❌ RESEND_API_KEY not set in env vars');
-    return { ok: false, error: 'RESEND_API_KEY missing' };
+  const transporter = getTransporter();
+  if (!transporter) {
+    return { ok: false, error: 'Email credentials missing' };
   }
-  console.log('✅ Resend client created successfully');
-  return { ok: true };
+  
+  try {
+    await transporter.verify();
+    console.log('✅ Email transporter verified successfully');
+    return { ok: true };
+  } catch (error) {
+    console.error('❌ Email verification failed:', error.message);
+    return { ok: false, error: error.message };
+  }
 }
 
 /**
  * Send order confirmation email to customer
  */
 export async function sendOrderConfirmationEmail(order) {
-  const resend = getResend();
-  if (!resend) {
-    console.error('❌ RESEND_API_KEY not configured — skipping email');
+  const transporter = getTransporter();
+  if (!transporter) {
+    console.error('❌ Email not configured — skipping email');
     return;
   }
 
@@ -113,19 +129,14 @@ export async function sendOrderConfirmationEmail(order) {
 </html>`;
 
   try {
-    const { data, error } = await resend.emails.send({
+    await transporter.sendMail({
       from: getSender(),
       to: order.customerEmail,
-      reply_to: process.env.EMAIL_USER || 'anshrajbaghel30@gmail.com',
+      replyTo: process.env.EMAIL_USER,
       subject: `✅ Order Confirmed — #${order.orderNumber} | A5X Robotics`,
       html
     });
-
-    if (error) {
-      console.error('❌ Resend error:', error);
-    } else {
-      console.log(`✅ Confirmation email sent to ${order.customerEmail} (id: ${data?.id})`);
-    }
+    console.log(`✅ Confirmation email sent to ${order.customerEmail}`);
   } catch (err) {
     console.error('❌ Email send failed:', err.message);
   }
@@ -135,9 +146,9 @@ export async function sendOrderConfirmationEmail(order) {
  * Send shipping notification email
  */
 export async function sendShippingEmail(order) {
-  const resend = getResend();
-  if (!resend) {
-    console.error('❌ RESEND_API_KEY not configured — skipping shipping email');
+  const transporter = getTransporter();
+  if (!transporter) {
+    console.error('❌ Email not configured — skipping shipping email');
     return;
   }
 
@@ -187,19 +198,14 @@ export async function sendShippingEmail(order) {
 </html>`;
 
   try {
-    const { data, error } = await resend.emails.send({
+    await transporter.sendMail({
       from: getSender(),
       to: order.customerEmail,
-      reply_to: process.env.EMAIL_USER || 'anshrajbaghel30@gmail.com',
+      replyTo: process.env.EMAIL_USER,
       subject: `🚚 Order Shipped — #${order.orderNumber} | A5X Robotics`,
       html
     });
-
-    if (error) {
-      console.error('❌ Resend shipping email error:', error);
-    } else {
-      console.log(`✅ Shipping email sent to ${order.customerEmail} (id: ${data?.id})`);
-    }
+    console.log(`✅ Shipping email sent to ${order.customerEmail}`);
   } catch (err) {
     console.error('❌ Shipping email failed:', err.message);
   }
@@ -209,10 +215,15 @@ export async function sendShippingEmail(order) {
  * Send new order alert to admin/owner when any order is placed
  */
 export async function sendAdminNewOrderAlert(order) {
-  const resend = getResend();
-  if (!resend) return;
+  const transporter = getTransporter();
+  if (!transporter) {
+    console.log('⚠️ Email not configured — skipping admin alert');
+    return;
+  }
 
-  const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'anshrajbaghel30@gmail.com';
+  const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER;
+  
+  console.log(`📧 Sending admin alert for order #${order.orderNumber} to ${adminEmail}...`);
 
   const html = `
 <!DOCTYPE html>
@@ -319,28 +330,23 @@ export async function sendAdminNewOrderAlert(order) {
 </html>`;
 
   try {
-    const { data, error } = await resend.emails.send({
+    await transporter.sendMail({
       from: getSender(),
       to: adminEmail,
+      replyTo: order.customerEmail,
       subject: `🛒 New Order #${order.orderNumber} — ₹${Number(order.total).toLocaleString('en-IN')} from ${order.customerName}`,
       html
     });
-
-    if (error) {
-      console.error('❌ Admin alert email error:', error);
-    } else {
-      console.log(`✅ Admin order alert sent to ${adminEmail} (id: ${data?.id})`);
-    }
+    console.log(`✅ Admin order alert sent to ${adminEmail}`);
   } catch (err) {
     console.error('❌ Admin alert email failed:', err.message);
   }
 }
 
-
 export async function sendCancellationEmail(order, reason = '') {
-  const resend = getResend();
-  if (!resend) {
-    console.error('❌ RESEND_API_KEY not configured — skipping cancellation email');
+  const transporter = getTransporter();
+  if (!transporter) {
+    console.error('❌ Email not configured — skipping cancellation email');
     return;
   }
 
@@ -415,19 +421,14 @@ export async function sendCancellationEmail(order, reason = '') {
 </html>`;
 
   try {
-    const { data, error } = await resend.emails.send({
+    await transporter.sendMail({
       from: getSender(),
       to: order.customerEmail,
-      reply_to: process.env.EMAIL_USER || 'anshrajbaghel30@gmail.com',
+      replyTo: process.env.EMAIL_USER,
       subject: `❌ Order Cancelled — #${order.orderNumber} | A5X Robotics`,
       html
     });
-
-    if (error) {
-      console.error('❌ Resend cancellation email error:', error);
-    } else {
-      console.log(`✅ Cancellation email sent to ${order.customerEmail} (id: ${data?.id})`);
-    }
+    console.log(`✅ Cancellation email sent to ${order.customerEmail}`);
   } catch (err) {
     console.error('❌ Cancellation email failed:', err.message);
   }

@@ -22,18 +22,33 @@ function generateOrderNumber() {
 }
 
 async function getNextOrderNumber() {
-  // Try MongoDB first
+  // Use timestamp-based unique order numbers to avoid duplicates
+  // This ensures every order has a truly unique number
   if (dbReady()) {
     try {
-      const count = await mongoose.model('Order').countDocuments();
-      return `A5X-${String(count + 1).padStart(6, '0')}`;
-    } catch {
-      // fall through to JSON fallback counter
+      // Find the last order and extract its number
+      const lastOrder = await mongoose.model('Order').findOne().sort({ createdAt: -1 });
+      if (lastOrder && lastOrder.orderNumber) {
+        // Try to parse sequential number (e.g., A5X-000123)
+        const match = lastOrder.orderNumber.match(/^A5X-(\d+)$/);
+        if (match) {
+          const nextNum = parseInt(match[1]) + 1;
+          const candidate = `A5X-${String(nextNum).padStart(6, '0')}`;
+          // Check if this number already exists (safety check)
+          const exists = await mongoose.model('Order').findOne({ orderNumber: candidate });
+          if (!exists) return candidate;
+        }
+      }
+      // If we couldn't get sequential, fall back to timestamp-based
+      return generateOrderNumber();
+    } catch (err) {
+      console.error('Error generating order number:', err);
+      return generateOrderNumber();
     }
   }
-  // JSON fallback — count existing orders
-  const orders = await readOrdersFallback();
-  return `A5X-${String(orders.length + 1).padStart(6, '0')}`;
+  
+  // JSON fallback — use timestamp-based to avoid duplicates
+  return generateOrderNumber();
 }
 
 async function readOrdersFallback() {
