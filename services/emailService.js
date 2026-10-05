@@ -21,12 +21,18 @@ function getTransporter() {
 
   return nodemailer.createTransport({
     service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
     auth: { user, pass },
     pool: true,
-    maxConnections: 5,
-    maxMessages: 100,
-    rateDelta: 1000, // 1 second between emails
-    rateLimit: 5     // max 5 emails per second
+    maxConnections: 1,
+    maxMessages: 3,
+    rateDelta: 2000, // 2 seconds between emails  
+    rateLimit: 1,    // max 1 email per 2 seconds
+    connectionTimeout: 60000, // 60 second timeout
+    greetingTimeout: 30000,   // 30 second greeting timeout
+    socketTimeout: 60000      // 60 second socket timeout
   });
 }
 
@@ -38,12 +44,8 @@ function getSender() {
  * Test email configuration
  */
 export async function testEmailConfig() {
-  const transporter = getTransporter();
-  if (!transporter) {
-    return { ok: false, error: 'Email credentials missing' };
-  }
-  
   try {
+    const transporter = getTransporter();
     await transporter.verify();
     console.log('✅ Email transporter verified successfully');
     return { ok: true };
