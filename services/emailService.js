@@ -16,13 +16,17 @@ function getTransporter() {
   const pass = process.env.EMAIL_PASS;
   
   if (!user || !pass) {
-    console.error('❌ EMAIL_USER or EMAIL_PASS not set in .env');
-    return null;
+    throw new Error('❌ EMAIL_USER or EMAIL_PASS not configured in .env');
   }
 
   return nodemailer.createTransport({
     service: 'gmail',
-    auth: { user, pass }
+    auth: { user, pass },
+    pool: true,
+    maxConnections: 5,
+    maxMessages: 100,
+    rateDelta: 1000, // 1 second between emails
+    rateLimit: 5     // max 5 emails per second
   });
 }
 
@@ -49,15 +53,24 @@ export async function testEmailConfig() {
   }
 }
 
+export async function runEmailTest() {
+  try {
+    const transporter = getTransporter();
+    await transporter.verify();
+    console.log('✅ Email transporter verified — Gmail SMTP is working');
+    return true;
+  } catch (err) {
+    console.error('❌ Email transporter verification FAILED:', err.message);
+    console.error('   Check EMAIL_USER and EMAIL_PASS in .env (Gmail App Password required, not account password)');
+    return false;
+  }
+}
+
 /**
  * Send order confirmation email to customer
  */
 export async function sendOrderConfirmationEmail(order) {
   const transporter = getTransporter();
-  if (!transporter) {
-    console.error('❌ Email not configured — skipping email');
-    return;
-  }
 
   console.log(`📧 Sending confirmation email to ${order.customerEmail}...`);
 
@@ -138,7 +151,15 @@ export async function sendOrderConfirmationEmail(order) {
     });
     console.log(`✅ Confirmation email sent to ${order.customerEmail}`);
   } catch (err) {
-    console.error('❌ Email send failed:', err.message);
+    console.error(`❌ CONFIRMATION EMAIL FAILED for order #${order.orderNumber}:`, {
+      error: err.message,
+      customerEmail: order.customerEmail,
+      total: order.total,
+      timestamp: new Date().toISOString(),
+      fullError: err
+    });
+    // Re-throw so calling code knows it failed
+    throw new Error(`Email delivery failed: ${err.message}`);
   }
 }
 
@@ -147,10 +168,6 @@ export async function sendOrderConfirmationEmail(order) {
  */
 export async function sendShippingEmail(order) {
   const transporter = getTransporter();
-  if (!transporter) {
-    console.error('❌ Email not configured — skipping shipping email');
-    return;
-  }
 
   const html = `
 <!DOCTYPE html>
@@ -207,7 +224,14 @@ export async function sendShippingEmail(order) {
     });
     console.log(`✅ Shipping email sent to ${order.customerEmail}`);
   } catch (err) {
-    console.error('❌ Shipping email failed:', err.message);
+    console.error(`❌ SHIPPING EMAIL FAILED for order #${order.orderNumber}:`, {
+      error: err.message,
+      customerEmail: order.customerEmail,
+      trackingNumber: order.trackingNumber,
+      timestamp: new Date().toISOString(),
+      fullError: err
+    });
+    throw new Error(`Email delivery failed: ${err.message}`);
   }
 }
 
@@ -339,7 +363,15 @@ export async function sendAdminNewOrderAlert(order) {
     });
     console.log(`✅ Admin order alert sent to ${adminEmail}`);
   } catch (err) {
-    console.error('❌ Admin alert email failed:', err.message);
+    console.error(`❌ ADMIN ALERT EMAIL FAILED for order #${order.orderNumber}:`, {
+      error: err.message,
+      adminEmail,
+      customerName: order.customerName,
+      total: order.total,
+      timestamp: new Date().toISOString(),
+      fullError: err
+    });
+    throw new Error(`Admin alert email failed: ${err.message}`);
   }
 }
 
@@ -430,6 +462,13 @@ export async function sendCancellationEmail(order, reason = '') {
     });
     console.log(`✅ Cancellation email sent to ${order.customerEmail}`);
   } catch (err) {
-    console.error('❌ Cancellation email failed:', err.message);
+    console.error(`❌ CANCELLATION EMAIL FAILED for order #${order.orderNumber}:`, {
+      error: err.message,
+      customerEmail: order.customerEmail,
+      reason,
+      timestamp: new Date().toISOString(),
+      fullError: err
+    });
+    throw new Error(`Email delivery failed: ${err.message}`);
   }
 }

@@ -134,6 +134,31 @@ app.get("/api/test-email", async (req, res) => {
   }
 });
 
+// Email health check endpoint
+app.get("/api/email/health", async (req, res) => {
+  try {
+    const result = await testEmailConfig();
+    const user = process.env.EMAIL_USER;
+    const adminEmail = process.env.ADMIN_EMAIL || user;
+    
+    res.json({
+      ok: result.ok,
+      service: 'Gmail SMTP',
+      configured: !!user && !!process.env.EMAIL_PASS,
+      emailUser: user || 'NOT_SET',
+      adminEmail: adminEmail || 'NOT_SET',
+      error: result.error || null,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(500).json({
+      ok: false,
+      error: err.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Public API routes
 app.use("/api/products", productRoutes);
 app.use("/api/kits", kitRoutes);
@@ -166,6 +191,22 @@ app.use((err, _req, res, _next) => {
 });
 
 async function start() {
+  // Test email configuration at startup
+  console.log('🔍 Testing email configuration...');
+  try {
+    const emailTest = await testEmailConfig();
+    if (emailTest.ok) {
+      console.log('✅ Email service ready — Gmail SMTP is working');
+    } else {
+      console.error('❌ Email service failed:', emailTest.error);
+      console.error('📧 New order alerts and confirmations will not be sent!');
+      console.error('💡 Check EMAIL_USER and EMAIL_PASS in .env file');
+    }
+  } catch (err) {
+    console.error('❌ Email configuration test failed:', err.message);
+    console.error('📧 Email notifications may not work properly');
+  }
+
   const uri = process.env.MONGODB_URI;
   if (uri) {
     try {

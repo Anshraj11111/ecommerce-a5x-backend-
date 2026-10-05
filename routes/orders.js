@@ -100,7 +100,15 @@ router.post('/', async (req, res) => {
       await order.save();
 
       // Alert admin immediately when new order arrives
-      sendAdminNewOrderAlert(order).catch(e => console.error('Admin alert error:', e.message));
+      sendAdminNewOrderAlert(order).catch(e => {
+        console.error(`❌ ADMIN ALERT FAILED for order #${order.orderNumber}:`, {
+          error: e.message,
+          customerEmail: order.customerEmail,
+          total: order.total,
+          timestamp: new Date().toISOString()
+        });
+        // TODO: Add fallback notification (SMS, webhook, etc.)
+      });
 
       return res.status(201).json({
         success: true,
@@ -127,7 +135,15 @@ router.post('/', async (req, res) => {
     await writeOrdersFallback(orders);
 
     // Alert admin immediately when new order arrives
-    sendAdminNewOrderAlert(newOrder).catch(e => console.error('Admin alert error:', e.message));
+    sendAdminNewOrderAlert(newOrder).catch(e => {
+      console.error(`❌ ADMIN ALERT FAILED for order #${newOrder.orderNumber}:`, {
+        error: e.message,
+        customerEmail: newOrder.customerEmail,
+        total: newOrder.total,
+        timestamp: new Date().toISOString()
+      });
+      // TODO: Add fallback notification (SMS, webhook, etc.)
+    });
 
     return res.status(201).json({
       success: true,
@@ -211,11 +227,32 @@ router.patch('/:id/status', authenticateToken, authorizeRole(['admin']), async (
 
       // Send email immediately — don't await so response is fast
       if (status === 'confirmed') {
-        sendOrderConfirmationEmail(order).catch(e => console.error('Email error:', e.message));
+        sendOrderConfirmationEmail(order).catch(e => {
+          console.error(`❌ CONFIRMATION EMAIL FAILED for order #${order.orderNumber}:`, {
+            error: e.message,
+            customerEmail: order.customerEmail,
+            total: order.total,
+            timestamp: new Date().toISOString()
+          });
+        });
       } else if (status === 'shipped') {
-        sendShippingEmail(order).catch(e => console.error('Email error:', e.message));
+        sendShippingEmail(order).catch(e => {
+          console.error(`❌ SHIPPING EMAIL FAILED for order #${order.orderNumber}:`, {
+            error: e.message,
+            customerEmail: order.customerEmail,
+            trackingNumber: order.trackingNumber,
+            timestamp: new Date().toISOString()
+          });
+        });
       } else if (status === 'cancelled') {
-        sendCancellationEmail(order, adminNotes || '').catch(e => console.error('Email error:', e.message));
+        sendCancellationEmail(order, adminNotes || '').catch(e => {
+          console.error(`❌ CANCELLATION EMAIL FAILED for order #${order.orderNumber}:`, {
+            error: e.message,
+            customerEmail: order.customerEmail,
+            reason: adminNotes,
+            timestamp: new Date().toISOString()
+          });
+        });
       }
 
       return res.json({ success: true, message: 'Order updated successfully', order });
@@ -243,11 +280,32 @@ router.patch('/:id/status', authenticateToken, authorizeRole(['admin']), async (
 
     // Send email immediately — don't await
     if (status === 'confirmed') {
-      sendOrderConfirmationEmail(order).catch(e => console.error('Email error:', e.message));
+      sendOrderConfirmationEmail(order).catch(e => {
+        console.error(`❌ CONFIRMATION EMAIL FAILED for order #${order.orderNumber}:`, {
+          error: e.message,
+          customerEmail: order.customerEmail,
+          total: order.total,
+          timestamp: new Date().toISOString()
+        });
+      });
     } else if (status === 'shipped') {
-      sendShippingEmail(order).catch(e => console.error('Email error:', e.message));
+      sendShippingEmail(order).catch(e => {
+        console.error(`❌ SHIPPING EMAIL FAILED for order #${order.orderNumber}:`, {
+          error: e.message,
+          customerEmail: order.customerEmail,
+          trackingNumber: order.trackingNumber,
+          timestamp: new Date().toISOString()
+        });
+      });
     } else if (status === 'cancelled') {
-      sendCancellationEmail(order, adminNotes || '').catch(e => console.error('Email error:', e.message));
+      sendCancellationEmail(order, adminNotes || '').catch(e => {
+        console.error(`❌ CANCELLATION EMAIL FAILED for order #${order.orderNumber}:`, {
+          error: e.message,
+          customerEmail: order.customerEmail,
+          reason: adminNotes,
+          timestamp: new Date().toISOString()
+        });
+      });
     }
 
     return res.json({ success: true, message: 'Order updated successfully', order });
