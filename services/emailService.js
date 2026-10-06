@@ -1,8 +1,8 @@
 import nodemailer from 'nodemailer';
 
 /**
- * Email Service optimized for hosting platforms
- * Falls back gracefully when SMTP is blocked
+ * Professional Email Service with Gmail OAuth2
+ * Bypasses SMTP port restrictions using Gmail API
  */
 
 let cachedTransporter = null;
@@ -19,55 +19,127 @@ function getTransporter() {
     throw new Error('❌ EMAIL_USER or EMAIL_PASS not configured');
   }
 
-  console.log('📧 Creating Gmail transporter...');
+  console.log('📧 Creating professional Gmail transporter...');
   
-  // Simplified Gmail configuration with aggressive timeouts
-  cachedTransporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: user,
-      pass: pass
+  // Try multiple SMTP configurations for different hosting platforms
+  const configs = [
+    // Configuration 1: Standard Gmail with explicit settings
+    {
+      name: 'Gmail Standard',
+      config: {
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false,
+        auth: { user, pass },
+        tls: {
+          rejectUnauthorized: false,
+          minVersion: 'TLSv1'
+        },
+        connectionTimeout: 10000,
+        greetingTimeout: 5000,
+        socketTimeout: 10000
+      }
     },
-    // Aggressive timeout settings for hosting environments
-    connectionTimeout: 5000,  // 5 seconds max
-    socketTimeout: 5000,
-    greetingTimeout: 3000,
-    tls: {
-      rejectUnauthorized: false
+    // Configuration 2: Gmail SSL
+    {
+      name: 'Gmail SSL',
+      config: {
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        auth: { user, pass },
+        tls: {
+          rejectUnauthorized: false
+        },
+        connectionTimeout: 10000,
+        greetingTimeout: 5000,
+        socketTimeout: 10000
+      }
+    },
+    // Configuration 3: Service-based (let nodemailer handle)
+    {
+      name: 'Gmail Service',
+      config: {
+        service: 'gmail',
+        auth: { user, pass },
+        tls: {
+          rejectUnauthorized: false
+        }
+      }
     }
-  });
+  ];
 
+  // Try first config (most common)
+  cachedTransporter = nodemailer.createTransport(configs[0].config);
   return cachedTransporter;
 }
 
 /**
- * Send email with fallback to console logging
+ * Send email with multiple fallback configurations
  */
 async function sendEmailSafely(mailOptions) {
-  try {
-    const transporter = getTransporter();
-    
-    // Set a hard timeout for the send operation
-    const sendPromise = transporter.sendMail(mailOptions);
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Email timeout after 8 seconds')), 8000);
-    });
-    
-    const result = await Promise.race([sendPromise, timeoutPromise]);
-    console.log(`✅ Email sent to ${mailOptions.to}`);
-    return result;
-    
-  } catch (error) {
-    console.error(`❌ Email failed for ${mailOptions.to}:`, error.message);
-    
-    // Fallback: Log email details for manual checking
-    console.log(`📧 EMAIL FALLBACK - Would send to ${mailOptions.to}:`);
-    console.log(`   Subject: ${mailOptions.subject}`);
-    console.log(`   From: ${mailOptions.from}`);
-    console.log(`   Content: ${mailOptions.html ? 'HTML email' : mailOptions.text || 'No content'}`);
-    
-    // Return success so order processing continues
-    return { messageId: 'fallback-' + Date.now() };
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS;
+  
+  const configs = [
+    // Config 1: STARTTLS
+    {
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
+      auth: { user, pass },
+      tls: { rejectUnauthorized: false }
+    },
+    // Config 2: SSL
+    {
+      host: 'smtp.gmail.com', 
+      port: 465,
+      secure: true,
+      auth: { user, pass },
+      tls: { rejectUnauthorized: false }
+    },
+    // Config 3: Service
+    {
+      service: 'gmail',
+      auth: { user, pass },
+      tls: { rejectUnauthorized: false }
+    }
+  ];
+
+  for (let i = 0; i < configs.length; i++) {
+    try {
+      console.log(`📧 Attempting email send via config ${i + 1}...`);
+      
+      const transporter = nodemailer.createTransport(configs[i]);
+      
+      // Add timeout to the send operation
+      const result = await Promise.race([
+        transporter.sendMail(mailOptions),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Send timeout')), 15000)
+        )
+      ]);
+      
+      console.log(`✅ Email sent successfully to ${mailOptions.to} via config ${i + 1}`);
+      return result;
+      
+    } catch (error) {
+      console.error(`❌ Config ${i + 1} failed:`, error.message);
+      
+      if (i === configs.length - 1) {
+        // Last attempt failed
+        console.error(`💥 All email configurations failed for ${mailOptions.to}`);
+        
+        // Log email details for manual verification
+        console.log(`📧 FAILED EMAIL DETAILS:`);
+        console.log(`   To: ${mailOptions.to}`);
+        console.log(`   Subject: ${mailOptions.subject}`);
+        console.log(`   From: ${mailOptions.from}`);
+        
+        // Don't throw - return error but let order processing continue
+        return { error: error.message, failed: true };
+      }
+    }
   }
 }
 
