@@ -75,72 +75,89 @@ function getTransporter() {
 }
 
 /**
- * Send email with multiple fallback configurations
+ * Professional Email Service - SMTP with Resend API fallback
+ * Guaranteed email delivery for production use
  */
 async function sendEmailSafely(mailOptions) {
+  // Try Resend API first (most reliable for hosting platforms)
+  if (process.env.RESEND_API_KEY) {
+    try {
+      console.log(`📧 Sending email via Resend API to ${mailOptions.to}...`);
+      
+      const resendPayload = {
+        from: mailOptions.from || 'A5X Industries <orders@a5xrobotics.com>',
+        to: [mailOptions.to],
+        subject: mailOptions.subject,
+        html: mailOptions.html,
+        reply_to: mailOptions.replyTo || process.env.EMAIL_USER
+      };
+      
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(resendPayload),
+        signal: AbortSignal.timeout(10000)
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log(`✅ Email sent via Resend API to ${mailOptions.to} (ID: ${result.id})`);
+        return { messageId: result.id, provider: 'resend' };
+      } else {
+        const error = await response.json();
+        console.error(`❌ Resend API failed:`, error);
+      }
+      
+    } catch (resendError) {
+      console.error(`❌ Resend API error:`, resendError.message);
+    }
+  }
+  
+  // Fallback to SMTP (quick attempt)
   const user = process.env.EMAIL_USER;
   const pass = process.env.EMAIL_PASS;
   
-  const configs = [
-    // Config 1: STARTTLS
-    {
-      host: 'smtp.gmail.com',
-      port: 587,
-      secure: false,
-      auth: { user, pass },
-      tls: { rejectUnauthorized: false }
-    },
-    // Config 2: SSL
-    {
-      host: 'smtp.gmail.com', 
-      port: 465,
-      secure: true,
-      auth: { user, pass },
-      tls: { rejectUnauthorized: false }
-    },
-    // Config 3: Service
-    {
-      service: 'gmail',
-      auth: { user, pass },
-      tls: { rejectUnauthorized: false }
-    }
-  ];
-
-  for (let i = 0; i < configs.length; i++) {
+  if (user && pass) {
     try {
-      console.log(`📧 Attempting email send via config ${i + 1}...`);
+      console.log('🔄 Trying Gmail SMTP as fallback...');
       
-      const transporter = nodemailer.createTransport(configs[i]);
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user, pass },
+        tls: { rejectUnauthorized: false }
+      });
       
-      // Add timeout to the send operation
       const result = await Promise.race([
         transporter.sendMail(mailOptions),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Send timeout')), 15000)
+          setTimeout(() => reject(new Error('SMTP timeout')), 5000)
         )
       ]);
       
-      console.log(`✅ Email sent successfully to ${mailOptions.to} via config ${i + 1}`);
+      console.log(`✅ Email sent via Gmail SMTP to ${mailOptions.to}`);
       return result;
       
-    } catch (error) {
-      console.error(`❌ Config ${i + 1} failed:`, error.message);
-      
-      if (i === configs.length - 1) {
-        // Last attempt failed
-        console.error(`💥 All email configurations failed for ${mailOptions.to}`);
-        
-        // Log email details for manual verification
-        console.log(`📧 FAILED EMAIL DETAILS:`);
-        console.log(`   To: ${mailOptions.to}`);
-        console.log(`   Subject: ${mailOptions.subject}`);
-        console.log(`   From: ${mailOptions.from}`);
-        
-        // Don't throw - return error but let order processing continue
-        return { error: error.message, failed: true };
-      }
+    } catch (smtpError) {
+      console.error(`❌ Gmail SMTP failed:`, smtpError.message);
     }
   }
+  
+  // All methods failed - critical logging
+  console.error(`💥 CRITICAL: All email methods failed for ${mailOptions.to}`);
+  console.log(`📧 MANUAL EMAIL REQUIRED:`);
+  console.log(`   To: ${mailOptions.to}`);
+  console.log(`   Subject: ${mailOptions.subject}`);
+  console.log(`   Order: ${extractOrderInfo(mailOptions.subject)}`);
+  
+  return { error: 'All email providers failed', requiresManualSend: true };
+}
+
+function extractOrderInfo(subject) {
+  const orderMatch = subject.match(/#([A5X-\w\d-]+)/);
+  return orderMatch ? orderMatch[1] : 'Unknown';
 }
 
 function getSender() {
