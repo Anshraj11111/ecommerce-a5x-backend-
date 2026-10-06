@@ -25,24 +25,25 @@ function getTransporter() {
   }
 
   console.log('📧 Creating new Gmail SMTP transporter...');
-  cachedTransporter = nodemailer.createTransport({
+  cachedTransporter = nodemailer.createTransporter({
     service: 'gmail',
     host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
+    port: 465,  // SSL port instead of 587
+    secure: true,  // Use SSL
     auth: { user, pass },
     pool: true,
-    maxConnections: 2,
-    maxMessages: 10,
-    rateDelta: 3000,     // 3 seconds between emails
-    rateLimit: 1,        // 1 email per 3 seconds  
-    connectionTimeout: 90000,  // 90 second timeout
-    greetingTimeout: 45000,    // 45 second greeting
-    socketTimeout: 90000,      // 90 second socket
-    // Additional reliability settings
-    requireTLS: true,
+    maxConnections: 1,
+    maxMessages: 5,
+    rateDelta: 5000,     // 5 seconds between emails
+    rateLimit: 1,        // 1 email per 5 seconds  
+    connectionTimeout: 120000,  // 120 second timeout
+    greetingTimeout: 60000,     // 60 second greeting
+    socketTimeout: 120000,      // 120 second socket
+    // Production-grade reliability for Render.com
+    requireTLS: false,
     tls: {
-      rejectUnauthorized: false
+      rejectUnauthorized: false,
+      ciphers: 'SSLv3'
     }
   });
 
