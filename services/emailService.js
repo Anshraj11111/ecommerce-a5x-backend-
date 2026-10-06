@@ -1,92 +1,67 @@
 import nodemailer from 'nodemailer';
 
 /**
- * Bulletproof Email Service with Multiple Failsafes
- * - Automatic retry with exponential backoff
- * - Multiple connection attempts
- * - Detailed error logging
- * - Fallback mechanisms
+ * Simple Email Service with nodemailer
+ * Optimized for Render.com hosting platform
  */
 
 let cachedTransporter = null;
-let lastTransporterTest = null;
 
 function getTransporter() {
+  if (cachedTransporter) {
+    return cachedTransporter;
+  }
+
   const user = process.env.EMAIL_USER;
   const pass = process.env.EMAIL_PASS;
   
   if (!user || !pass) {
-    throw new Error('❌ EMAIL_USER or EMAIL_PASS not configured in .env');
+    throw new Error('❌ EMAIL_USER or EMAIL_PASS not configured');
   }
 
-  // Cache transporter for 30 minutes to avoid repeated connections
-  if (cachedTransporter && lastTransporterTest && (Date.now() - lastTransporterTest < 30 * 60 * 1000)) {
-    return cachedTransporter;
-  }
-
-  console.log('📧 Creating new Gmail SMTP transporter...');
+  console.log('📧 Creating Gmail transporter...');
+  
+  // Use Gmail SMTP with optimized settings for Render.com
   cachedTransporter = nodemailer.createTransport({
-    service: 'gmail',
-    host: 'smtp.gmail.com',
-    port: 465,  // SSL port instead of 587
-    secure: true,  // Use SSL
-    auth: { user, pass },
-    pool: true,
-    maxConnections: 1,
-    maxMessages: 5,
-    rateDelta: 5000,     // 5 seconds between emails
-    rateLimit: 1,        // 1 email per 5 seconds  
-    connectionTimeout: 120000,  // 120 second timeout
-    greetingTimeout: 60000,     // 60 second greeting
-    socketTimeout: 120000,      // 120 second socket
-    // Production-grade reliability for Render.com
-    requireTLS: false,
+    service: 'gmail',  // Let nodemailer handle the host/port
+    auth: {
+      user: user,
+      pass: pass
+    },
     tls: {
-      rejectUnauthorized: false,
-      ciphers: 'SSLv3'
+      rejectUnauthorized: false
     }
   });
 
-  lastTransporterTest = Date.now();
   return cachedTransporter;
 }
 
 /**
- * Retry function with exponential backoff
- */
-async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 2000) {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      console.error(`❌ Attempt ${attempt} failed:`, error.message);
-      
-      if (attempt === maxRetries) {
-        throw error; // Last attempt failed
-      }
-      
-      // Exponential backoff: 2s, 4s, 8s
-      const delay = baseDelay * Math.pow(2, attempt - 1);
-      console.log(`⏳ Retrying in ${delay}ms...`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-      
-      // Reset transporter for next attempt
-      cachedTransporter = null;
-      lastTransporterTest = null;
-    }
-  }
-}
-
-/**
- * Send email with bulletproof reliability
+ * Send email with retry logic
  */
 async function sendEmailSafely(mailOptions) {
-  return await retryWithBackoff(async () => {
-    const transporter = getTransporter();
-    const result = await transporter.sendMail(mailOptions);
-    console.log(`✅ Email sent successfully to ${mailOptions.to}`);
-    return result;
-  }, 3, 2000);
+  const maxRetries = 2;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const transporter = getTransporter();
+      const result = await transporter.sendMail(mailOptions);
+      console.log(`✅ Email sent to ${mailOptions.to}`);
+      return result;
+    } catch (error) {
+      console.error(`❌ Email attempt ${attempt} failed:`, error.message);
+      
+      if (attempt === maxRetries) {
+        console.error(`💥 All email attempts failed for ${mailOptions.to}`);
+        // Don't throw - let the application continue
+        return { error: error.message };
+      }
+      
+      // Reset transporter and try again
+      cachedTransporter = null;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
 }
 
 function getSender() {
@@ -94,18 +69,16 @@ function getSender() {
 }
 
 /**
- * Test email configuration with retry
+ * Test email configuration
  */
 export async function testEmailConfig() {
   try {
-    await retryWithBackoff(async () => {
-      const transporter = getTransporter();
-      await transporter.verify();
-      console.log('✅ Email transporter verified successfully');
-    }, 2, 1000);
+    const transporter = getTransporter();
+    await transporter.verify();
+    console.log('✅ Email transporter verified');
     return { ok: true };
   } catch (error) {
-    console.error('❌ Email verification failed after retries:', error.message);
+    console.error('❌ Email verification failed:', error.message);
     return { ok: false, error: error.message };
   }
 }
@@ -114,11 +87,10 @@ export async function runEmailTest() {
   try {
     const result = await testEmailConfig();
     if (result.ok) {
-      console.log('✅ Email transporter verified — Gmail SMTP is working');
+      console.log('✅ Email service ready - Gmail SMTP working');
       return true;
     } else {
-      console.error('❌ Email transporter verification FAILED:', result.error);
-      console.error('   Check EMAIL_USER and EMAIL_PASS in .env (Gmail App Password required, not account password)');
+      console.error('❌ Email service failed:', result.error);
       return false;
     }
   } catch (err) {

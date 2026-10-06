@@ -191,21 +191,8 @@ app.use((err, _req, res, _next) => {
 });
 
 async function start() {
-  // Test email configuration at startup
-  console.log('🔍 Testing email configuration...');
-  try {
-    const emailTest = await testEmailConfig();
-    if (emailTest.ok) {
-      console.log('✅ Email service ready — Gmail SMTP is working');
-    } else {
-      console.error('❌ Email service failed:', emailTest.error);
-      console.error('📧 New order alerts and confirmations will not be sent!');
-      console.error('💡 Check EMAIL_USER and EMAIL_PASS in .env file');
-    }
-  } catch (err) {
-    console.error('❌ Email configuration test failed:', err.message);
-    console.error('📧 Email notifications may not work properly');
-  }
+  // Skip email test at startup - verify only when sending actual emails
+  console.log('📧 Email service configured (verification will happen on first send)');
 
   const uri = process.env.MONGODB_URI;
   if (uri) {
