@@ -25,7 +25,7 @@ function getTransporter() {
   }
 
   console.log('📧 Creating new Gmail SMTP transporter...');
-  cachedTransporter = nodemailer.createTransporter({
+  cachedTransporter = nodemailer.createTransport({
     service: 'gmail',
     host: 'smtp.gmail.com',
     port: 465,  // SSL port instead of 587
