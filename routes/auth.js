@@ -21,7 +21,7 @@ router.get("/google/callback",
   (req, res) => {
     try {
       const user = req.user;
-      const token = generateToken(user._id, user.username, user.role);
+      const token = generateToken(user._id, user.username, user.email, user.role);
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
       // Redirect to frontend with token
@@ -70,7 +70,7 @@ router.post("/signup", validate(schemas.signup), async (req, res, next) => {
     console.log('User saved successfully:', user._id);
 
     // Generate token
-    const token = generateToken(user._id, user.username, user.role);
+    const token = generateToken(user._id, user.username, user.email, user.role);
 
     console.log('=== SIGNUP SUCCESS ===');
     res.status(201).json({
@@ -140,7 +140,7 @@ router.post("/login", validate(schemas.login), async (req, res, next) => {
     await user.resetLoginAttempts();
 
     // Generate token
-    const token = generateToken(user._id, user.username, user.role);
+    const token = generateToken(user._id, user.username, user.email, user.role);
 
     console.log('=== LOGIN SUCCESS ===');
     res.json({
@@ -225,7 +225,7 @@ router.post("/make-admin", async (req, res) => {
     await user.save();
     
     // Generate new token with admin role
-    const token = generateToken(user._id, user.username, 'admin');
+    const token = generateToken(user._id, user.username, user.email, 'admin');
     
     res.json({ 
       success: true, 

@@ -50,11 +50,12 @@ export const authorizeRole = (allowedRoles) => {
   };
 };
 
-export const generateToken = (userId, username, role) => {
+export const generateToken = (userId, username, email, role) => {
   return jwt.sign(
     { 
       id: userId, 
       username: username,
+      email: email,
       role: role 
     },
     process.env.JWT_SECRET,
