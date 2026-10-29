@@ -161,13 +161,25 @@ router.post('/', async (req, res) => {
 });
 
 // Get all orders (Admin only)
-router.get('/', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
     const skip = (page - 1) * limit;
+    const isAdmin = req.user.role === 'admin';
 
     if (dbReady()) {
-      const query = status ? { status } : {};
+      const query = {};
+      
+      // If not admin, filter by user's email
+      if (!isAdmin) {
+        query.customerEmail = req.user.email;
+      }
+      
+      // Apply status filter if provided
+      if (status) {
+        query.status = status;
+      }
+      
       const orders = await Order.find(query).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit));
       const total = await Order.countDocuments(query);
       return res.json({ orders, pagination: { page: parseInt(page), limit: parseInt(limit), total, pages: Math.ceil(total / limit) } });
@@ -175,6 +187,12 @@ router.get('/', authenticateToken, authorizeRole(['admin']), async (req, res) =>
 
     // JSON fallback
     let orders = await readOrdersFallback();
+    
+    // Filter by user email if not admin
+    if (!isAdmin) {
+      orders = orders.filter(o => o.customerEmail === req.user.email);
+    }
+    
     if (status) orders = orders.filter(o => o.status === status);
     const total = orders.length;
     const paginated = orders.slice(skip, skip + parseInt(limit));
