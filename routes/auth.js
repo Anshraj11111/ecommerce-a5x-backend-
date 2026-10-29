@@ -238,8 +238,6 @@ router.post("/make-admin", async (req, res) => {
   }
 });
 
-export default router;
-
 // PUT /api/auth/profile - Update user profile
 router.put("/profile", authenticateToken, async (req, res) => {
   try {
@@ -279,3 +277,5 @@ router.put("/profile", authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to update profile' });
   }
 });
+
+export default router;
