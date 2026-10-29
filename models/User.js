@@ -11,12 +11,21 @@ const userSchema = new mongoose.Schema(
       minlength: 3,
       maxlength: 30
     },
+    name: {
+      type: String,
+      trim: true,
+      default: ''
+    },
     email: { 
       type: String, 
       required: true, 
       unique: true, 
       lowercase: true,
       match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    },
+    phone: {
+      type: String,
+      default: ''
     },
     password: { 
       type: String, 
@@ -31,6 +40,13 @@ const userSchema = new mongoose.Schema(
     avatar: {
       type: String,
       default: ''
+    },
+    address: {
+      street: { type: String, default: '' },
+      city: { type: String, default: '' },
+      state: { type: String, default: '' },
+      pincode: { type: String, default: '' },
+      landmark: { type: String, default: '' }
     },
     role: { 
       type: String, 

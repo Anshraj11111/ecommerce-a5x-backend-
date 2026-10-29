@@ -239,3 +239,43 @@ router.post("/make-admin", async (req, res) => {
 });
 
 export default router;
+
+// PUT /api/auth/profile - Update user profile
+router.put("/profile", authenticateToken, async (req, res) => {
+  try {
+    const { name, phone, address } = req.body;
+    const userId = req.user.id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Update user fields
+    if (name) user.name = name;
+    if (phone) user.phone = phone;
+    if (address) {
+      user.address = {
+        street: address.street || user.address?.street || '',
+        city: address.city || user.address?.city || '',
+        state: address.state || user.address?.state || '',
+        pincode: address.pincode || user.address?.pincode || '',
+        landmark: address.landmark || user.address?.landmark || ''
+      };
+    }
+
+    await user.save();
+
+    // Return updated user without password
+    const updatedUser = await User.findById(userId).select('-password');
+    
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: updatedUser
+    });
+  } catch (error) {
+    console.error('Profile update error:', error);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
