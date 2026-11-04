@@ -166,6 +166,14 @@ router.get('/', authenticateToken, async (req, res) => {
     const { status, page = 1, limit = 20, viewAs } = req.query;
     const skip = (page - 1) * limit;
     const isAdmin = req.user.role === 'admin';
+    
+    console.log('📦 Orders GET Request:', {
+      userEmail: req.user.email,
+      userRole: req.user.role,
+      isAdmin,
+      viewAs,
+      willFilterByEmail: viewAs === 'customer' || !isAdmin
+    });
 
     if (dbReady()) {
       const query = {};
@@ -174,6 +182,9 @@ router.get('/', authenticateToken, async (req, res) => {
       // This allows admins to view their own orders as customers
       if (viewAs === 'customer' || !isAdmin) {
         query.customerEmail = req.user.email;
+        console.log('🔍 Filtering orders by email:', req.user.email);
+      } else {
+        console.log('👑 Admin view - showing all orders');
       }
       
       // Apply status filter if provided
@@ -183,7 +194,11 @@ router.get('/', authenticateToken, async (req, res) => {
       
       const orders = await Order.find(query).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit));
       const total = await Order.countDocuments(query);
+      
+      console.log('✅ Returning', orders.length, 'orders');
+      
       return res.json({ orders, pagination: { page: parseInt(page), limit: parseInt(limit), total, pages: Math.ceil(total / limit) } });
+    }
     }
 
     // JSON fallback
