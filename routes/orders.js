@@ -199,7 +199,6 @@ router.get('/', authenticateToken, async (req, res) => {
       
       return res.json({ orders, pagination: { page: parseInt(page), limit: parseInt(limit), total, pages: Math.ceil(total / limit) } });
     }
-    }
 
     // JSON fallback
     let orders = await readOrdersFallback();
