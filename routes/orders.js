@@ -160,18 +160,19 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Get all orders (Admin only)
+// Get all orders (filtered by user email for customer view, all orders for admin view)
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { status, page = 1, limit = 20 } = req.query;
+    const { status, page = 1, limit = 20, viewAs } = req.query;
     const skip = (page - 1) * limit;
     const isAdmin = req.user.role === 'admin';
 
     if (dbReady()) {
       const query = {};
       
-      // If not admin, filter by user's email
-      if (!isAdmin) {
+      // If viewAs=customer OR not admin, filter by user's email
+      // This allows admins to view their own orders as customers
+      if (viewAs === 'customer' || !isAdmin) {
         query.customerEmail = req.user.email;
       }
       
@@ -188,8 +189,8 @@ router.get('/', authenticateToken, async (req, res) => {
     // JSON fallback
     let orders = await readOrdersFallback();
     
-    // Filter by user email if not admin
-    if (!isAdmin) {
+    // Filter by user email if viewAs=customer OR not admin
+    if (viewAs === 'customer' || !isAdmin) {
       orders = orders.filter(o => o.customerEmail === req.user.email);
     }
     
