@@ -203,18 +203,32 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// Get single order by ID (Admin only)
-router.get('/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+// Get single order by ID (User can view their own order, Admin can view any)
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
+    const isAdmin = req.user.role === 'admin';
+    
     if (dbReady()) {
       const order = await Order.findById(req.params.id);
       if (!order) return res.status(404).json({ error: 'Order not found' });
+      
+      // If not admin, verify order belongs to user
+      if (!isAdmin && order.customerEmail !== req.user.email) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
       return res.json(order);
     }
 
     const orders = await readOrdersFallback();
     const order = orders.find(o => o._id === req.params.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
+    
+    // If not admin, verify order belongs to user
+    if (!isAdmin && order.customerEmail !== req.user.email) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
     res.json(order);
   } catch (error) {
     console.error('Error fetching order:', error);
@@ -225,7 +239,7 @@ router.get('/:id', authenticateToken, authorizeRole(['admin']), async (req, res)
 // Update order status (Admin only)
 router.patch('/:id/status', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   try {
-    const { status, trackingNumber, adminNotes } = req.body;
+    const { status, trackingNumber, courierPartner, adminNotes } = req.body;
     const now = new Date();
 
     if (dbReady()) {
@@ -234,11 +248,40 @@ router.patch('/:id/status', authenticateToken, authorizeRole(['admin']), async (
 
       if (status) {
         order.status = status;
-        if (status === 'confirmed' && !order.confirmedAt) order.confirmedAt = now;
-        else if (status === 'shipped' && !order.shippedAt) order.shippedAt = now;
-        else if (status === 'delivered' && !order.deliveredAt) order.deliveredAt = now;
+        
+        // Set timestamps and estimated delivery
+        if (status === 'confirmed' && !order.confirmedAt) {
+          order.confirmedAt = now;
+          // Estimate delivery: 5-7 days from confirmation
+          const estimatedDays = 6; // average of 5-7
+          order.estimatedDelivery = new Date(now.getTime() + estimatedDays * 24 * 60 * 60 * 1000);
+        }
+        else if (status === 'shipped' && !order.shippedAt) {
+          order.shippedAt = now;
+          // Update estimate: 3-5 days from shipping
+          if (!order.estimatedDelivery) {
+            const estimatedDays = 4; // average of 3-5
+            order.estimatedDelivery = new Date(now.getTime() + estimatedDays * 24 * 60 * 60 * 1000);
+          }
+        }
+        else if (status === 'out_for_delivery' && !order.outForDeliveryAt) {
+          order.outForDeliveryAt = now;
+          // Update estimate: delivery today or tomorrow
+          if (!order.estimatedDelivery || order.estimatedDelivery < now) {
+            order.estimatedDelivery = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000);
+          }
+        }
+        else if (status === 'delivered' && !order.deliveredAt) {
+          order.deliveredAt = now;
+          order.estimatedDelivery = now; // actual delivery date
+        }
+        else if (status === 'cancelled' && !order.cancelledAt) {
+          order.cancelledAt = now;
+        }
       }
+      
       if (trackingNumber) order.trackingNumber = trackingNumber;
+      if (courierPartner) order.courierPartner = courierPartner;
       if (adminNotes) order.adminNotes = adminNotes;
 
       await order.save();
